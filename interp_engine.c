@@ -1768,6 +1768,7 @@ int jvm_pc_init(CLASS_METHOD *method)
 {
 	jvm_pc.pc = (u1 *)method->code_attr->code;
 
+	calltrace();
 	printf("jvm pc init at: 0x%x\n", jvm_pc.pc);
 }
 

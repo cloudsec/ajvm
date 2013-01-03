@@ -4,7 +4,7 @@
 #include "type.h"
 #include "list.h"
 
-#define JVM_VERSION					0.01
+#define JVM_VERSION					0.02
 #define JVM_BANNER					"(c) Zhitong Wang 2012"
 
 #define JVM_CLASS_MAGIC                 		0xcafebabe
@@ -335,7 +335,7 @@ typedef struct jvm_pc_st {
 }JVM_PC;
 
 typedef struct jvm_arg {
-	char class_path[104];
+	char class_path[1024];
 }JVM_ARG;
 
 JVM_INTERP_ENV *curr_jvm_interp_env;

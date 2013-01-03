@@ -9,6 +9,7 @@
 #include <assert.h>
 
 #include "jvm.h"
+#include "trace.h"
 #include "type.h"
 #include "list.h"
 #include "log.h"
@@ -43,6 +44,9 @@ int jvm_init(JVM_ARG *arg, const char *class_name)
 {
         if (log_init() == -1)
                 return -1;
+
+	if (calltrace_init() == -1)
+		return -1;
 
 	INIT_LIST_HEAD(&jvm_class_list_head);
         init_class_parse();
@@ -118,6 +122,7 @@ int main(int argc, char **argv)
 
 	print_jvm_arg();
 
+	GET_BP(top_rbp);
 	if (jvm_init(jvm_arg, argv[argc - 1]) == -1)
 		return 0;
 
