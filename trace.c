@@ -219,6 +219,19 @@ void show_registers(void)
 	uint64_t rax, rbx, rcx, rdx, rsi, rdi;
 	uint64_t r9, r10, r11, r12, r13, r14, r15;
 
+	GET_AX(rax)
+	GET_BX(rbx)
+	GET_CX(rcx)
+	GET_DX(rdx)
+	GET_SI(rsi)
+	GET_DI(rdi)
+	GET_R9(r9)
+	GET_R10(r10)
+	GET_R11(r11)
+	GET_R12(r12)
+	GET_R13(r13)
+	GET_R14(r14)
+	GET_R15(r15)
 	printf("Registers:\n");
 	printf("rax = 0x%016x, rbx = 0x%016x, rcx = 0x%016x, rdx = 0x%016x\n"
 		"rsi = 0x%016x, rdi = 0x%016x, r8 = 0x%016x, r9 = 0x%016x\n"
