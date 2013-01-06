@@ -1,4 +1,4 @@
-jvm:
-	gcc -o jvm jvm.c classloader.c interp_engine.c trace.c log.c -lpthread -g
+ajvm:
+	gcc -o ajvm jvm.c classloader.c interp_engine.c vm_error.c trace.c log.c -lpthread -g
 clean:
-	rm -f jvm *.o
+	rm -f ajvm *.o

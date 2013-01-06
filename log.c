@@ -88,8 +88,8 @@ int log_init(void)
                 return -1;
         }
 
-        log_arg->log_level = LOG_DEBUG2;
-        //log_arg->log_level = LOG_FATAL;
+        //log_arg->log_level = LOG_DEBUG2;
+        log_arg->log_level = LOG_ERROR;
         log_arg->log_file_num = LOG_NUM;
         log_arg->curr_log_num = 0;
 

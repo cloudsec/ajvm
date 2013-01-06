@@ -116,11 +116,13 @@ int main(int argc, char **argv)
 			jvm_banner();
 			return ;
 		default:
-			printf("bad option.\n");
+			printf("Bad option.\n");
+			jvm_usage(argv[0]);
+			return -1;
 		}
 	}
 
-	print_jvm_arg();
+	//print_jvm_arg();
 
 	GET_BP(top_rbp);
 	if (jvm_init(jvm_arg, argv[argc - 1]) == -1)

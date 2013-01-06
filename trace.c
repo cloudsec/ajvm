@@ -431,7 +431,7 @@ int calltrace_init(void)
 	 * above, so we can munmap the file now.
 	 */ 
 	free_elf_mmap();
-	print_symtab();
+	//print_symtab();
 
 	return 0; 
 }

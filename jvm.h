@@ -83,16 +83,16 @@
 #define ITEM_Object					7
 #define ITEM_Uninitialized				8
 
-struct constant_info_st {
-	u2 index;
-	u1 *base;
-}__attribute__ ((packed));
-
 typedef struct opcode_st {
 	int len;
 	char *base;
 	struct list_head list;
 }OPCODE;
+
+struct constant_info_st {
+	u2 index;
+	u1 *base;
+}__attribute__ ((packed));
 
 struct CONSTANT_Class_info {
 	u2 name_index;
@@ -303,11 +303,11 @@ typedef struct method_info {
 
 typedef struct jvm_class {
         u4 class_magic;
+        u2 minor_version;
+        u2 major_version;
         u2 access_flag;
         u2 this_class;
         u2 super_class;
-        u2 minor_version;
-        u2 major_version;
         u2 constant_pool_count;
 	u2 interfaces_count;
         u2 fileds_count;
@@ -346,6 +346,8 @@ JVM_ARG *jvm_arg;
 int jvm_stack_depth;
 struct list_head jvm_class_list_head;
 
+int mmap_class_file(const char *class_file);
+int mmap_exit(void);
 void init_class_parse(void);
 void exit_class_parse(void);
 void fix_class_info(struct list_head *list_head);
