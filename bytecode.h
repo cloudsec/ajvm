@@ -1,3 +1,8 @@
+/*
+ * bytecode.h (c) 2012, 2013 wzt	http://www.cloud-sec.org
+ *
+ */
+
 #ifndef BYTECODE_H
 #define BYTECODE_H
 

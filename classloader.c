@@ -68,17 +68,34 @@ int mmap_exit(void)
         return 0;
 }
 
+void show_class_info(char *fmt, ...)
+{
+	va_list arg;
+	char buf[256];
+
+	va_start(arg, fmt);
+	vsprintf(buf, fmt, arg);
+	va_end(arg);
+
+	if (jvm_arg->print_class) {
+		printf("%s", buf);
+	}
+	else {
+		__debug2("%s", buf);
+	}
+}
+
 int parse_class_magic(CLASS *jvm_class)
 {
         /* read class magic number. */
         CLASS_READ_U4(jvm_class->class_magic, p_mem)
 
-        __debug2("magic: 0x%x\n", jvm_class->class_magic);
+        show_class_info("magic: 0x%x\n", jvm_class->class_magic);
         if (jvm_class->class_magic != JVM_CLASS_MAGIC) {
                 jvm_error(VM_ERROR_CLASS_FILE, "JVM class magic not match.\n");
                 return -1;
         }
-        __debug2("jvm class magic match: 0x%x\n", jvm_class->class_magic);
+        show_class_info("jvm class magic match: 0x%x\n", jvm_class->class_magic);
         return 0;
 }
 
@@ -86,11 +103,11 @@ int parse_class_version(CLASS *jvm_class)
 {
         /* read class minor_version. */
         CLASS_READ_U2(jvm_class->minor_version, p_mem)
-        __debug2("jvm class minor_version: %d\n", jvm_class->minor_version);
+        show_class_info("jvm class minor_version: %d\n", jvm_class->minor_version);
 
         /* read class major_version. */
         CLASS_READ_U2(jvm_class->major_version, p_mem)
-        __debug2("jvm class major_version: %d\n", jvm_class->major_version);
+        show_class_info("jvm class major_version: %d\n", jvm_class->major_version);
 
 	if (jvm_class->major_version < 45 || jvm_class->major_version > 50) {
 		char err_buf[128];
@@ -125,7 +142,7 @@ int handle_class_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
 		jvm_error(VM_ERROR_CLASS_FILE, err_buf);
 		return -1;
 	}
-        __debug2("name_index: %d\n", class_info->name_index);
+        show_class_info("name_index: %d\n", class_info->name_index);
 
         class_info->base = jvm_class->constant_info[class_info->name_index].base;
 
@@ -148,7 +165,7 @@ int handle_class_InvokeDynamic(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U2(invoke_dyc_info->bootstrap_method_attr_index, p_mem);
         CLASS_READ_U2(invoke_dyc_info->name_and_type_index, p_mem);
-        __debug2("bootstrap_method_attr_index: %d, name_and_type_index: %d\n",
+        show_class_info("bootstrap_method_attr_index: %d, name_and_type_index: %d\n",
         	invoke_dyc_info->bootstrap_method_attr_index,
                 invoke_dyc_info->name_and_type_index);
 
@@ -172,7 +189,7 @@ int handle_class_utf8(CLASS *jvm_class, u2 idx)
 	memset(buf, '\0', len + 1);
 
         memcpy(buf, p_mem, len);
-        __debug2("len: %d\t%s\n", len, buf);
+        show_class_info("len: %d\t%s\n", len, buf);
         p_mem += len;
 
         jvm_class->constant_info[idx].index = idx;
@@ -193,7 +210,7 @@ int handle_class_method_type(CLASS *jvm_class, u2 idx)
 	}
         
         CLASS_READ_U2(method_type_info->descriptor_index, p_mem);
-        __debug2("descriptor_index %d\n", method_type_info->descriptor_index);
+        show_class_info("descriptor_index %d\n", method_type_info->descriptor_index);
 
         jvm_class->constant_info[idx].index = idx;
         jvm_class->constant_info[idx].base = (u1 *)method_type_info;
@@ -214,7 +231,7 @@ int handle_class_method_handle(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U1(method_handle_info->reference_kind, p_mem);
         CLASS_READ_U2(method_handle_info->reference_index, p_mem);
-        __debug2("reference_kind: %d, reference_index: %d\n",
+        show_class_info("reference_kind: %d, reference_index: %d\n",
         	method_handle_info->reference_kind,
                 method_handle_info->reference_index);
 
@@ -237,7 +254,7 @@ int handle_class_name_and_type(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U2(name_type_info->name_index, p_mem);
         CLASS_READ_U2(name_type_info->descriptor_index, p_mem);
-        __debug2("name_index: %d, descriptor_index: %d\n",
+        show_class_info("name_index: %d, descriptor_index: %d\n",
         	name_type_info->name_index, name_type_info->descriptor_index);
 
         jvm_class->constant_info[idx].index = idx;
@@ -259,7 +276,7 @@ int handle_class_double(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U4(double_info->high_bytes, p_mem);
         CLASS_READ_U4(double_info->low_bytes, p_mem);
-        __debug2("high_bytes: %d, low_bytes: %d\n",
+        show_class_info("high_bytes: %d, low_bytes: %d\n",
                 double_info->high_bytes, double_info->low_bytes);
 
         jvm_class->constant_info[idx].index = idx;
@@ -280,7 +297,7 @@ int handle_class_float(CLASS *jvm_class, u2 idx)
         }
 
         CLASS_READ_U4(float_info->bytes, p_mem);
-        __debug2("bytes: %d\n", float_info->bytes);
+        show_class_info("bytes: %d\n", float_info->bytes);
 
         jvm_class->constant_info[idx].index = idx;
         jvm_class->constant_info[idx].base = (u1 *)float_info;
@@ -300,7 +317,7 @@ int handle_class_integer(CLASS *jvm_class, u2 idx)
         }
 
         CLASS_READ_U4(integer_info->bytes, p_mem);
-        __debug2("bytes: %d\n", integer_info->bytes);
+        show_class_info("bytes: %d\n", integer_info->bytes);
 
         jvm_class->constant_info[idx].index = idx;
         jvm_class->constant_info[idx].base = (u1 *)integer_info;
@@ -322,7 +339,7 @@ int handle_class_long(CLASS *jvm_class, u2 idx)
         CLASS_READ_U2(long_info->high_bytes, p_mem);
         CLASS_READ_U2(long_info->low_bytes, p_mem);
 
-        __debug2("high bytes: %d, low bytes: %d\n",
+        show_class_info("high bytes: %d, low bytes: %d\n",
         	long_info->high_bytes, long_info->low_bytes);
 
         jvm_class->constant_info[idx].index = idx;
@@ -349,7 +366,7 @@ int hanlde_class_string(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
 		return -1;
 	}
 
-        __debug2("string index: %d\n", string_info->string_index);
+        show_class_info("string index: %d\n", string_info->string_index);
 
 	jvm_class->constant_info[idx].index = idx;
 	jvm_class->constant_info[idx].base = (u1 *)string_info;
@@ -380,7 +397,7 @@ int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx
 		jvm_error(VM_ERROR_CLASS_FILE, "JVM string_index error.");
 		return -1;
 	}
-        __debug2("class_index: %d, name_and_type_index: %d\n",
+        show_class_info("class_index: %d, name_and_type_index: %d\n",
                  methodref_info->class_index,
                  methodref_info->name_and_type_index);
 
@@ -395,10 +412,10 @@ int parse_class_constant(CLASS *jvm_class)
         u1 constant_tag;
         u2 idx;
 
-        __debug2("\n-----------parse contant pool count----------------------:\n\n");
+        show_class_info("\n-----------parse contant pool count----------------------:\n\n");
         /* read constant_pool_count */
         CLASS_READ_U2(jvm_class->constant_pool_count, p_mem)
-        __debug2("jvm constant_pool_count: %d\n", jvm_class->constant_pool_count);
+        show_class_info("jvm constant_pool_count: %d\n", jvm_class->constant_pool_count);
 
 	if (jvm_class->constant_pool_count >= 65535) {
 		jvm_error(VM_ERROR_CLASS_FILE, "JVM constant_pool_count too bigger.\n");
@@ -417,7 +434,7 @@ int parse_class_constant(CLASS *jvm_class)
 	/* The constant_pool table is indexed from 1 to constant_pool_count-1. */
         for (idx = 1; idx <= jvm_class->constant_pool_count - 1; idx++ ) {
                 CLASS_READ_U1(constant_tag, p_mem)
-                __debug2("- idx: %d constant tag: %d\t", idx, (int)constant_tag);
+                show_class_info("- idx: %d constant tag: %d\t", idx, (int)constant_tag);
                 switch (constant_tag) {
                 case CONSTANT_Fieldref:
                 case CONSTANT_Methodref:
@@ -475,7 +492,7 @@ int parse_class_constant(CLASS *jvm_class)
 			return -1;
                 }
         }
-	__debug2("\n");
+	show_class_info("\n");
 
         return 0;
 
@@ -488,7 +505,7 @@ int parse_class_access_flag(CLASS *jvm_class)
 {
         /* read class access flag. */
         CLASS_READ_U2(jvm_class->access_flag, p_mem)
-        __debug2("class access_flag: 0x%x\n", jvm_class->access_flag);
+        show_class_info("class access_flag: 0x%x\n", jvm_class->access_flag);
 
 /*
 	if (jvm_class->access_flag != ACC_PUBLIC ||
@@ -510,7 +527,7 @@ int parse_class_this_super(CLASS *jvm_class)
 {
         CLASS_READ_U2(jvm_class->this_class, p_mem)
         CLASS_READ_U2(jvm_class->super_class, p_mem)
-        __debug2("this_class: %d\tsuper_class: %d\n\n", jvm_class->this_class, 
+        show_class_info("this_class: %d\tsuper_class: %d\n\n", jvm_class->this_class, 
 		jvm_class->super_class);
 
         if (jvm_class->this_class < 1 &&
@@ -533,11 +550,11 @@ int parse_class_interface(CLASS *jvm_class)
         u2 idx, index;
 
         CLASS_READ_U2(jvm_class->interfaces_count, p_mem)
-        __debug2("interfaces_count: %d\n", jvm_class->interfaces_count);
+        show_class_info("interfaces_count: %d\n", jvm_class->interfaces_count);
 
         for (idx = 0; idx < jvm_class->interfaces_count; idx++ ) {
                 CLASS_READ_U2(index, p_mem);
-                __debug2("index: %d\n", index);
+                show_class_info("index: %d\n", index);
         }
 
         return 0;
@@ -550,9 +567,9 @@ int parse_class_filed(CLASS *jvm_class)
 
 	INIT_LIST_HEAD(&(jvm_class->filed_list_head));
 
-	__debug2("---------------parse class filed--------------------------:\n");
+	show_class_info("---------------parse class filed--------------------------:\n");
         CLASS_READ_U2(jvm_class->fileds_count, p_mem)
-        __debug2("filed_count: %d\n", jvm_class->fileds_count);
+        show_class_info("filed_count: %d\n", jvm_class->fileds_count);
 
 	for (idx = 0; idx < jvm_class->fileds_count; idx++) {
 		CLASS_FILED *new_filed;
@@ -564,34 +581,34 @@ int parse_class_filed(CLASS *jvm_class)
 		}
 
         	CLASS_READ_U2(new_filed->access_flag, p_mem)
-        	__debug2("\naccess_flag: 0x%x\n", new_filed->access_flag);
+        	show_class_info("\naccess_flag: 0x%x\n", new_filed->access_flag);
 
         	CLASS_READ_U2(new_filed->name_index, p_mem)
-        	__debug2("name_index: 0x%x\n", new_filed->name_index);
+        	show_class_info("name_index: 0x%x\n", new_filed->name_index);
 
         	CLASS_READ_U2(new_filed->descriptor_index, p_mem)
-        	__debug2("descriptor_index: 0x%x\n", new_filed->descriptor_index);
+        	show_class_info("descriptor_index: 0x%x\n", new_filed->descriptor_index);
 
         	CLASS_READ_U2(new_filed->attributes_count, p_mem)
-        	__debug2("attributes_count: 0x%x\n", new_filed->attributes_count);
+        	show_class_info("attributes_count: 0x%x\n", new_filed->attributes_count);
 
                 /* parse attributes */
 		for (count = 0; count < new_filed->attributes_count; count++) {
                 	CLASS_READ_U2(name_index, p_mem)
-                	__debug2("attritbutes name_index: %d\n", name_index);
+                	show_class_info("attritbutes name_index: %d\n", name_index);
 
                 	if (!strcmp(jvm_class->constant_info[name_index].base, "ConstantValue")) {
-                        	__debug2("parse ConstantValue attribute:\n");
+                        	show_class_info("parse ConstantValue attribute:\n");
                 	}
                 	if (!strcmp(jvm_class->constant_info[name_index].base, "Signature")) {
-                        	__debug2("parse Signature:\n");
+                        	show_class_info("parse Signature:\n");
                 	}
 		}
 		
 		new_filed->name_base = jvm_class->constant_info[new_filed->name_index].base;
 		new_filed->desc_base = jvm_class->constant_info[new_filed->descriptor_index].base;
 		new_filed->class = jvm_class;
-		__debug2("#%s\t%s\n", new_filed->name_base, new_filed->desc_base);
+		show_class_info("#%s\t%s\n", new_filed->name_base, new_filed->desc_base);
 		list_add_tail(&(new_filed->list), &(jvm_class->filed_list_head));
 	}
 
@@ -611,16 +628,16 @@ int __parse_exception_table(CLASS_CODE *code, u4 len)
 
         for (idx = 0; idx < len; idx++ ) {
                 CLASS_READ_U2(exception_table[idx].start_pc, p_mem)
-                __debug2("start_pc: %d\n", exception_table[idx].start_pc);
+                show_class_info("start_pc: %d\n", exception_table[idx].start_pc);
 
                 CLASS_READ_U2(exception_table[idx].end_pc, p_mem)
-                __debug2("end_pc: %d\n", exception_table[idx].end_pc);
+                show_class_info("end_pc: %d\n", exception_table[idx].end_pc);
 
                 CLASS_READ_U2(exception_table[idx].handler_pc, p_mem)
-                __debug2("handler_pc: %d\n", exception_table[idx].handler_pc);
+                show_class_info("handler_pc: %d\n", exception_table[idx].handler_pc);
 
                 CLASS_READ_U2(exception_table[idx].catch_type, p_mem)
-                __debug2("catch_type: %d\n", exception_table[idx].catch_type);
+                show_class_info("catch_type: %d\n", exception_table[idx].catch_type);
         }
 
 	code->exception_table = exception_table;
@@ -631,9 +648,9 @@ void print_line_number_table(LINE_NUMBER_TABLE_ATTR *table_attr)
 {
 	u2 idx;
 
-	__debug2("\nLineNumberTable:\n");
+	show_class_info("\nLineNumberTable:\n");
 	for (idx = 0; idx < table_attr->line_number_table_length; idx++) {
-		__debug2("line: %d : %d\n", 
+		show_class_info("line: %d : %d\n", 
 			table_attr->table_base[idx].start_pc,
 			table_attr->table_base[idx].line_number);
 	}
@@ -651,10 +668,10 @@ int __parse_line_number_table(CLASS_CODE *code, int index)
 	}
 
         CLASS_READ_U4(table_attr->attribute_length, p_mem)
-        __debug2("\t\tattribute_length: %d\n", table_attr->attribute_length);
+        show_class_info("\t\tattribute_length: %d\n", table_attr->attribute_length);
 
         CLASS_READ_U2(table_attr->line_number_table_length, p_mem)
-        __debug2("\t\tline_number_table_length: %d\n", 
+        show_class_info("\t\tline_number_table_length: %d\n", 
 		table_attr->line_number_table_length);
 
 	table_attr->table_base = (LINE_NUMBER_TABLE *)
@@ -666,10 +683,10 @@ int __parse_line_number_table(CLASS_CODE *code, int index)
 
         for (idx = 0; idx < table_attr->line_number_table_length; idx++ ) {
                 CLASS_READ_U2((table_attr->table_base)[idx].start_pc, p_mem)
-                __debug2("\t\tstart_pc: %d\n", (table_attr->table_base)[idx].start_pc);
+                show_class_info("\t\tstart_pc: %d\n", (table_attr->table_base)[idx].start_pc);
 
                 CLASS_READ_U2(table_attr->table_base[idx].line_number, p_mem)
-                __debug2("\t\tline_number: %d\n", table_attr->table_base[idx].line_number);
+                show_class_info("\t\tline_number: %d\n", table_attr->table_base[idx].line_number);
         }
 
 	code->table_attr = table_attr;
@@ -681,50 +698,50 @@ int __parse_verification_type_info(union verification_type_info *ver_info)
         u1 tag;
 
         CLASS_READ_U1(tag, p_mem)
-        __debug2("\t\ttag: %d\n", tag);
+        show_class_info("\t\ttag: %d\n", tag);
         switch (tag) {
                 case ITEM_Top:
-                        __debug2("\t\tITEM_Top.\n");
+                        show_class_info("\t\tITEM_Top.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Integer:
-                        __debug2("\t\tITEM_Integer.\n");
+                        show_class_info("\t\tITEM_Integer.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Float:
-                        __debug2("\t\tITEM_float.\n");
+                        show_class_info("\t\tITEM_float.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Double:
-                        __debug2("\t\tITEM_Double.\n");
+                        show_class_info("\t\tITEM_Double.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Long:
-                        __debug2("\t\tITEM_Long.\n");
+                        show_class_info("\t\tITEM_Long.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Null:
-                        __debug2("\t\tITEM_NULL.\n");
+                        show_class_info("\t\tITEM_NULL.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_UninitializedThis:
-                        __debug2("\t\tITEM_UninitializedThis.\n");
+                        show_class_info("\t\tITEM_UninitializedThis.\n");
 			ver_info->tag = tag;
                         break;
                 case ITEM_Object:
                 {
-                        __debug2("\t\tITEM_Object.\n");
+                        show_class_info("\t\tITEM_Object.\n");
 			ver_info->tag = tag;
                         CLASS_READ_U2(ver_info->a.cpool_index, p_mem)
-                        __debug2("\t\tcpool_index: %d\n", ver_info->a.cpool_index);
+                        show_class_info("\t\tcpool_index: %d\n", ver_info->a.cpool_index);
                         break;
                 }
                 case ITEM_Uninitialized:
                 {
-                        __debug2("\t\tITEM_Uninitialized.\n");
+                        show_class_info("\t\tITEM_Uninitialized.\n");
 			ver_info->tag = tag;
                         CLASS_READ_U2(ver_info->b.offset, p_mem)
-                        __debug2("\t\toffset: %d\n", ver_info->b.offset);
+                        show_class_info("\t\toffset: %d\n", ver_info->b.offset);
                         break;
                 }
                 default:
@@ -766,19 +783,19 @@ int __parse_stack_map_frame(STACK_MAP_FRAME *stack_frame)
 	u1 idx;
 
 	CLASS_READ_U1(frame_type, p_mem)
-        __debug2("\t\tframe_type: %d\n", frame_type);
+        show_class_info("\t\tframe_type: %d\n", frame_type);
 	stack_frame->frame_type = frame_type;
 
         if (frame_type <= 63) {
         	stack_frame->offset_delta = frame_type;
-                __debug2("\t\tsame_frame\toffset_delta: %d\n", stack_frame->offset_delta);
+                show_class_info("\t\tsame_frame\toffset_delta: %d\n", stack_frame->offset_delta);
         }
         if (frame_type >= 64 && frame_type <= 127) {
 		union verification_type_info *ver_info;
 
         	stack_frame->offset_delta = frame_type - 64;
                 stack_frame->stack_num = 1;
-                __debug2("\t\tsame_locals_l_stack_item_frame\toffset_delta: %d\n",
+                show_class_info("\t\tsame_locals_l_stack_item_frame\toffset_delta: %d\n",
                 	stack_frame->offset_delta);
 
 		ver_info = parse_ver_info(stack_frame->stack_num);
@@ -791,7 +808,7 @@ int __parse_stack_map_frame(STACK_MAP_FRAME *stack_frame)
 
                 stack_frame->stack_num = 1;
                 CLASS_READ_U2(stack_frame->offset_delta, p_mem)
-                __debug2("\t\tsame_locals_l_stack_item_frame_extended\toffset_delta: %d\n",
+                show_class_info("\t\tsame_locals_l_stack_item_frame_extended\toffset_delta: %d\n",
                         stack_frame->offset_delta);
                 ver_info = parse_ver_info(stack_frame->stack_num);
                 if (!ver_info)
@@ -802,21 +819,21 @@ int __parse_stack_map_frame(STACK_MAP_FRAME *stack_frame)
         }
         if (frame_type >= 248 && frame_type <= 250) {
                 CLASS_READ_U2(stack_frame->offset_delta, p_mem)
-                __debug2("\t\tchop_frame\toffset_delta: %d\n", stack_frame->offset_delta);
+                show_class_info("\t\tchop_frame\toffset_delta: %d\n", stack_frame->offset_delta);
         }
         if (frame_type == 251) {
                 CLASS_READ_U2(stack_frame->offset_delta, p_mem)
-                __debug2("\t\tsame_frame_extended\toffset_delta: %d\n", 
+                show_class_info("\t\tsame_frame_extended\toffset_delta: %d\n", 
 			stack_frame->offset_delta);
         }
         if (frame_type >= 252 && frame_type <= 254) {
 		union verification_type_info *ver_info;
 
                 CLASS_READ_U2(stack_frame->offset_delta, p_mem)
-                __debug2("\t\tappend_frame\toffset_delta: %d\n", stack_frame->offset_delta);
+                show_class_info("\t\tappend_frame\toffset_delta: %d\n", stack_frame->offset_delta);
 
                 stack_frame->locals_num = frame_type - 251;
-                __debug2("\t\tlocals_num: %d\n", stack_frame->locals_num);
+                show_class_info("\t\tlocals_num: %d\n", stack_frame->locals_num);
                 ver_info = parse_ver_info(stack_frame->stack_num);
                 if (!ver_info)
                         return -1;
@@ -839,10 +856,10 @@ int __parse_stack_map_table(CLASS_CODE *code, u2 index)
 	stack_map->attribute_name_index = index;
 
         CLASS_READ_U4(stack_map->attribute_length, p_mem)
-        __debug2("\t\tattribute_length: %d\n", stack_map->attribute_length);
+        show_class_info("\t\tattribute_length: %d\n", stack_map->attribute_length);
 
         CLASS_READ_U2(stack_map->number_of_entries, p_mem)
-        __debug2("\t\tnumber_of_entries: %d\n", stack_map->number_of_entries);
+        show_class_info("\t\tnumber_of_entries: %d\n", stack_map->number_of_entries);
 
 	stack_map->stack_frame = (STACK_MAP_FRAME *)malloc(
 		sizeof(STACK_MAP_FRAME) * stack_map->number_of_entries);
@@ -872,34 +889,34 @@ void print_stack_map(STACK_MAP_ATTR *stack_map)
 	u1 frame_type;
 	u2 idx;
 
-	__debug2("\nStackMapTable: number of entries: %d\n", 
+	show_class_info("\nStackMapTable: number of entries: %d\n", 
 		stack_map->number_of_entries);
 	for (idx = 0; idx < stack_map->number_of_entries; idx++) {
 		frame_type = (stack_map->stack_frame + idx)->frame_type;
 	        if (frame_type <= 63) {
-                	__debug2("frame_type: %d\tsame_frame\toffset_delta: %d\n", 
+                	show_class_info("frame_type: %d\tsame_frame\toffset_delta: %d\n", 
 				frame_type, (stack_map->stack_frame + idx)->offset_delta);
         	}
         	if (frame_type >= 64 && frame_type <= 127) {
-                	__debug2("frame_type: %d\tsame_locals_l_stack_item_frame\t"
+                	show_class_info("frame_type: %d\tsame_locals_l_stack_item_frame\t"
 				"offset_delta: %d\n",
                         	frame_type, (stack_map->stack_frame + idx)->offset_delta);
 		}
         	if (frame_type == 247) {
-                	__debug2("frame_type: %d\tsame_locals_l_stack_item_frame_extended\t"
+                	show_class_info("frame_type: %d\tsame_locals_l_stack_item_frame_extended\t"
 				"offset_delta: %d\n",
                         	frame_type, (stack_map->stack_frame + idx)->offset_delta);
 		}
         	if (frame_type >= 248 && frame_type <= 250) {
-                	__debug2("frame_type: %d\tchop_frame\toffset_delta: %d\n", 
+                	show_class_info("frame_type: %d\tchop_frame\toffset_delta: %d\n", 
 				frame_type, (stack_map->stack_frame + idx)->offset_delta);
         	}
         	if (frame_type == 251) {
-                	__debug2("frame_type: %d\tsame_frame_extended\toffset_delta: %d\n",
+                	show_class_info("frame_type: %d\tsame_frame_extended\toffset_delta: %d\n",
                         	frame_type, (stack_map->stack_frame + idx)->offset_delta);
         	}
         	if (frame_type >= 252 && frame_type <= 254) {
-			__debug2("frame_type: %d\tappend_frame\toffset_delta: %d\n", 
+			show_class_info("frame_type: %d\tappend_frame\toffset_delta: %d\n", 
 				frame_type, (stack_map->stack_frame + idx)->offset_delta);
 		}
 	}
@@ -908,7 +925,7 @@ void print_stack_map(STACK_MAP_ATTR *stack_map)
 int add_opcode(CLASS_CODE *code)
 {
         CLASS_READ_U4(code->code_length, p_mem)
-        __debug2("\tcode_length: %d\n", code->code_length);
+        show_class_info("\tcode_length: %d\n", code->code_length);
 
         code->code = (u1 *)malloc(code->code_length + 1);
         if (!code->code) {
@@ -946,7 +963,7 @@ int init_method_stack(CLASS_CODE *code)
 	code->stack_frame.max_locals = code->max_locals;
 	code->stack_frame.prev_stack = NULL;
 
-	__debug2("#stack size: %d\t#local: 0x%x\tstack: 0x%x\n", stack_size,
+	show_class_info("#stack size: %d\t#local: 0x%x\tstack: 0x%x\n", stack_size,
 		code->stack_frame.local_var_table, code->stack_frame.operand_stack);
 	
 	return 0;
@@ -970,13 +987,13 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
 	code->method = (u4 *)method;
 
         CLASS_READ_U4(code->attribute_length, p_mem)
-        __debug2("\tattribute_length: %d\n", code->attribute_length);
+        show_class_info("\tattribute_length: %d\n", code->attribute_length);
 
         CLASS_READ_U2(code->max_stack, p_mem)
-        __debug2("\tmax_stack: %d\n", code->max_stack);
+        show_class_info("\tmax_stack: %d\n", code->max_stack);
 
         CLASS_READ_U2(code->max_locals, p_mem)
-        __debug2("\tmax_locals: %d\n", code->max_locals);
+        show_class_info("\tmax_locals: %d\n", code->max_locals);
 
 	if (add_opcode(code) == -1)
 		return -1;
@@ -985,25 +1002,25 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
 		return -1;
 
         CLASS_READ_U2(code->exception_table_length, p_mem)
-        __debug2("\texception_table_length: %d\n", code->exception_table_length);
+        show_class_info("\texception_table_length: %d\n", code->exception_table_length);
         if (__parse_exception_table(code, code->exception_table_length) == -1)
 		return -1;
 
         CLASS_READ_U2(code->attributes_count, p_mem)
-        __debug2("\tattributes_count: %d\n", code->attributes_count);
+        show_class_info("\tattributes_count: %d\n", code->attributes_count);
 
         /* parse attributes */
         for (idx = 0; idx < code->attributes_count; idx++ ) {
                 CLASS_READ_U2(attribute_name_index, p_mem)
-                __debug2("\tidx: %d attribute_name_index: %d", idx + 1, attribute_name_index);
+                show_class_info("\tidx: %d attribute_name_index: %d", idx + 1, attribute_name_index);
 
                 if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LineNumberTable")) {
-                        __debug2("\n\tparse LineNumberTable:\n");
+                        show_class_info("\n\tparse LineNumberTable:\n");
                         if (__parse_line_number_table(code, attribute_name_index) == -1)
 				return -1;
                 }
                 if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "StackMapTable")) {
-                        __debug2("\n\tparse StackMapTable:\n");
+                        show_class_info("\n\tparse StackMapTable:\n");
                         if (__parse_stack_map_table(code, attribute_name_index) == -1)
 				return -1;
                 }
@@ -1011,9 +1028,6 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
                         ;
                 }
                 if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LocalVariableTypeTable")) {
-                        ;
-                }
-                if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "StackMapTable")) {
                         ;
                 }
         }
@@ -1035,9 +1049,9 @@ int parse_exception_attribute(CLASS_METHOD *method, u2 index)
 	exception->attribute_name_index = index;
 
         CLASS_READ_U4(exception->attribute_length, p_mem)
-        __debug2("\tattribute_length: %d\n", exception->attribute_length);
+        show_class_info("\tattribute_length: %d\n", exception->attribute_length);
         CLASS_READ_U2(exception->number_of_exceptions, p_mem)
-        __debug2("\tnumber_of_exceptions: %d\n", exception->number_of_exceptions);
+        show_class_info("\tnumber_of_exceptions: %d\n", exception->number_of_exceptions);
 
 	exception->exception_index_table = 
 		(u2 *)malloc(sizeof(u2) * exception->attribute_length);
@@ -1065,7 +1079,7 @@ int parse_synthetic_attribute(CLASS_METHOD *method, u2 index)
 
 	synthetic->attribute_name_index = index;
         CLASS_READ_U4(synthetic->attribute_length, p_mem)
-	__debug2("\tattribute_length: %d\n", synthetic->attribute_length);
+	show_class_info("\tattribute_length: %d\n", synthetic->attribute_length);
 
 	method->synthetic = synthetic;
 	return 0;
@@ -1083,7 +1097,7 @@ int parse_deprecated_attribute(CLASS_METHOD *method, u2 index)
 
         deprecated->attribute_name_index = index;
         CLASS_READ_U4(deprecated->attribute_length, p_mem)
-        __debug2("\tattribute_length: %d\n", deprecated->attribute_length);
+        show_class_info("\tattribute_length: %d\n", deprecated->attribute_length);
 
         method->deprecated = deprecated;
         return 0;
@@ -1096,14 +1110,14 @@ int parse_class_method(CLASS *jvm_class)
 
 	INIT_LIST_HEAD(&(jvm_class->method_list_head));
 
-        __debug2("\n---------------parse class method-------------------------:\n\n");
+        show_class_info("\n---------------parse class method-------------------------:\n\n");
         CLASS_READ_U2(jvm_class->method_count, p_mem)
-        __debug2("method_count: %d\n", jvm_class->method_count);
+        show_class_info("method_count: %d\n", jvm_class->method_count);
 
         for (idx = 0; idx < jvm_class->method_count; idx++ ) {
 		CLASS_METHOD *new_method;
 
-		__debug2("\n--------%d-----------\n", idx);
+		show_class_info("\n--------%d-----------\n", idx);
 		new_method = (CLASS_METHOD *)malloc(sizeof(CLASS_METHOD));
 		if (!new_method) {
 			__error("malloc failed.");
@@ -1111,76 +1125,76 @@ int parse_class_method(CLASS *jvm_class)
 		}
 
                 CLASS_READ_U2(new_method->access_flag, p_mem)
-                __debug2("access_flags: 0x%x\n", new_method->access_flag);
+                show_class_info("access_flags: 0x%x\n", new_method->access_flag);
 
                 CLASS_READ_U2(new_method->name_index, p_mem)
-                __debug2("name_index: %d\n", new_method->name_index);
+                show_class_info("name_index: %d\n", new_method->name_index);
 
                 CLASS_READ_U2(new_method->descriptor_index, p_mem)
-                __debug2("descriptor_index: %d\n", new_method->descriptor_index);
+                show_class_info("descriptor_index: %d\n", new_method->descriptor_index);
 
                 CLASS_READ_U2(new_method->attributes_count, p_mem)
-                __debug2("attributes_count: %d\n\n", new_method->attributes_count);
+                show_class_info("attributes_count: %d\n\n", new_method->attributes_count);
 
                 /* parse attributes */
 		for (count = 0; count < new_method->attributes_count; count++) {
                 	CLASS_READ_U2(name_index, p_mem)
-                	__debug2("attritbutes name_index: %d\n", name_index);
-			__debug2("!%s\n", jvm_class->constant_info[name_index].base);
+                	show_class_info("attritbutes name_index: %d\n", name_index);
+			show_class_info("!%s\n", jvm_class->constant_info[name_index].base);
 
                 	if (!strcmp(jvm_class->constant_info[name_index].base, "Code")) {
-                        	__debug2("parse code attribute:\n");
+                        	show_class_info("parse code attribute:\n");
                         	if (parse_code_attribute(jvm_class, new_method, name_index) == -1)
 					return -1;
                 	}
 			else if (!strcmp(jvm_class->constant_info[name_index].base, "Exceptions")) {
-				__debug2("parse Exceptions attribute:\n");
+				show_class_info("parse Exceptions attribute:\n");
 				if (parse_exception_attribute(new_method, name_index) == -1)
 					return -1;
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, "Signature")) {
-				__debug2("parse Signature attribute:\n");
+				show_class_info("parse Signature attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, "Synthetic")) {
-				__debug2("parse Synthetic attribute:\n");
+				show_class_info("parse Synthetic attribute:\n");
                         	if (parse_synthetic_attribute(new_method, name_index) == -1)
 					return -1;
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, "Deprecated")) {
-				__debug2("parse Deprecated attribute:\n");
+				show_class_info("parse Deprecated attribute:\n");
                         	if (parse_deprecated_attribute(new_method, name_index) == -1)
 					return -1;
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, "Deprecated")) {
-				__debug2("parse Deprecated attribute:\n");
+				show_class_info("parse Deprecated attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, 
 				"untimeVisibleAnnotations")) {
-				__debug2("parse untimeVisibleAnnotations attribute:\n");
+				show_class_info("parse untimeVisibleAnnotations attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, 
 				"RuntimeInvisibleAnnotations")) {
-				__debug2("parse RuntimeInvisibleAnnotations attribute:\n");
+				show_class_info("parse RuntimeInvisibleAnnotations attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, 
 				"RuntimeVisibleParameterAnnotations")) {
-				__debug2("parse RuntimeVisibleParameterAnnotations attribute:\n");
+				show_class_info("parse RuntimeVisibleParameterAnnotations attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, 
 				"RuntimeInVisibleParameterAnnotations")) {
-				__debug2("parse RuntimeInVisibleParameterAnnotations attribute:\n");
+				show_class_info("parse RuntimeInVisibleParameterAnnotations attribute:\n");
                 	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, "AnnotationDefault")) {
-				__debug2("parse AnnotationDefault attribute:\n");
+				show_class_info("parse AnnotationDefault attribute:\n");
                 	}
 			else {
-				__debug2("error attribute.\n");
+				show_class_info("error attribute.\n");
 				return -1;
 			}
 		}
                 new_method->name_base = jvm_class->constant_info[new_method->name_index].base;
                 new_method->desc_base = jvm_class->constant_info[new_method->descriptor_index].base;
-                __debug2("#%s\t%s\n", new_method->name_base, new_method->desc_base);
+                show_class_info("#%s\t%s\n", new_method->name_base, new_method->desc_base);
 		new_method->class = jvm_class;
                 list_add_tail(&(new_method->list), &(jvm_class->method_list_head));
         }
@@ -1201,7 +1215,7 @@ CLASS_FILED *lookup_class_filed(struct list_head *list_head, char *class_name,
 			list_for_each(s, (&r->filed_list_head)) {
 				p = list_entry(s, CLASS_FILED, list);
 				if (p && !strcmp(p->name_base, method_name)) {
-					//__debug2("found method: %s\n", p->name_base);
+					//show_class_info("found method: %s\n", p->name_base);
 					return p;
 				}
 			}
@@ -1223,7 +1237,7 @@ CLASS_FILED *__lookup_class_filed(struct list_head *list_head, char *method_name
 			list_for_each(s, (&r->filed_list_head)) {
 				p = list_entry(s, CLASS_FILED, list);
 				if (p && !strcmp(p->name_base, method_name)) {
-					//__debug2("found method: %s\n", p->name_base);
+					//show_class_info("found method: %s\n", p->name_base);
 					return p;
 				}
 			}
@@ -1246,7 +1260,7 @@ CLASS_METHOD *lookup_class_method(struct list_head *list_head, char *class_name,
 			list_for_each(s, (&r->method_list_head)) {
 				p = list_entry(s, CLASS_METHOD, list);
 				if (p && !strcmp(p->name_base, method_name)) {
-					//__debug2("found method: %s\n", p->name_base);
+					//show_class_info("found method: %s\n", p->name_base);
 					return p;
 				}
 			}
@@ -1268,7 +1282,7 @@ CLASS_METHOD *__lookup_class_method(struct list_head *list_head, char *method_na
                         list_for_each(s, (&r->method_list_head)) {
                                 p = list_entry(s, CLASS_METHOD, list);
                                 if (p && !strcmp(p->name_base, method_name)) {
-                                        //__debug2("found method: %s\n", p->name_base);
+                                        //show_class_info("found method: %s\n", p->name_base);
                                         return p;
                                 }
                         }
@@ -1364,7 +1378,7 @@ CLASS *jvm_load_class(const char *class_path, const char *class_name)
 
 		memset(tmp_path, '\0', 1024);
 		snprintf(tmp_path, 1024, "%s/%s", class_path, dirent->d_name);
-		//__debug2("%s\n", dirent->d_name);
+		//show_class_info("%s\n", dirent->d_name);
 		if (stat(tmp_path, &f_stat) == -1) {
 			__error("stat error.");
 			closedir(dir);
@@ -1372,7 +1386,7 @@ CLASS *jvm_load_class(const char *class_path, const char *class_name)
 		}
 		if (S_ISREG(f_stat.st_mode)) {
 			if (!strcmp(dirent->d_name, tmp)) {
-				__debug2("found class file: %s\n", tmp);
+				show_class_info("found class file: %s\n", tmp);
 				class = jvm_parse_class_file(tmp_path, class_name);
 				if (!class) {
 					closedir(dir);
@@ -1387,7 +1401,7 @@ CLASS *jvm_load_class(const char *class_path, const char *class_name)
 		}
 	}
 
-	//__debug2("not found class file: %s\n", tmp);
+	//show_class_info("not found class file: %s\n", tmp);
 	closedir(dir);
 	return NULL;
 }

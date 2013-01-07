@@ -335,6 +335,7 @@ typedef struct jvm_pc_st {
 }JVM_PC;
 
 typedef struct jvm_arg {
+	int print_class;
 	char class_path[1024];
 }JVM_ARG;
 

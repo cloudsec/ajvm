@@ -16,9 +16,11 @@
 
 void jvm_usage(const char *proc)
 {
-        fprintf(stdout, "usage: %s <option> <class_name>\n\n", proc);
+        fprintf(stdout, "usage: %s <option>\n\n", proc);
 	fprintf(stdout, "option:\n");
-	fprintf(stdout, "-p\t\tclass file path.\n");
+	fprintf(stdout, "-p [class_path]\t\tInterpt java bytecode.\n");
+	fprintf(stdout, "-s [class_name]\t\tDisplay class file info.\n");
+	fprintf(stdout, "-v\t\t\tShow jvm version.\n");
 }
 
 int jvm_arg_init(void)
@@ -38,6 +40,25 @@ int jvm_arg_init(void)
 void print_jvm_arg(void)
 {
 	printf("class path: %s\n", jvm_arg->class_path);
+}
+
+int show_jvm_class(JVM_ARG *arg)
+{
+        if (log_init() == -1)
+                return -1;
+
+        if (calltrace_init() == -1)
+                return -1;
+
+        INIT_LIST_HEAD(&jvm_class_list_head);
+        init_class_parse();
+
+        if (!jvm_parse_class_file(arg->class_path, arg->class_path)) {
+		calltrace_exit();
+                return -1;
+	}
+
+	return 0;
 }
 
 int jvm_init(JVM_ARG *arg, const char *class_name)
@@ -106,9 +127,14 @@ int main(int argc, char **argv)
 	if (jvm_arg_init() == -1)
 		return -1;
 
-	while ((c = getopt(argc, argv, "p:v")) != -1) {
+	while ((c = getopt(argc, argv, "p:s:v")) != -1) {
 		switch (c) {
 		case 'p':
+			memset(jvm_arg->class_path, '\0', 1024);
+			strcpy(jvm_arg->class_path, optarg);
+			break;
+		case 's':
+			jvm_arg->print_class = 1;
 			memset(jvm_arg->class_path, '\0', 1024);
 			strcpy(jvm_arg->class_path, optarg);
 			break;
@@ -123,6 +149,11 @@ int main(int argc, char **argv)
 	}
 
 	//print_jvm_arg();
+
+	if (jvm_arg->print_class) {
+		show_jvm_class(jvm_arg);
+		return 0;
+	}
 
 	GET_BP(top_rbp);
 	if (jvm_init(jvm_arg, argv[argc - 1]) == -1)
