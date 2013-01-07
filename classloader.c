@@ -577,7 +577,7 @@ int parse_class_filed(CLASS *jvm_class)
 
 		new_filed = (CLASS_FILED *)malloc(sizeof(CLASS_FILED));
 		if (!new_filed) {
-			__error("malloc failed.");
+			jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
 			return -1;
 		}
 
@@ -601,9 +601,25 @@ int parse_class_filed(CLASS *jvm_class)
                 	if (!strcmp(jvm_class->constant_info[name_index].base, "ConstantValue")) {
                         	show_class_info("parse ConstantValue attribute:\n");
                 	}
-                	if (!strcmp(jvm_class->constant_info[name_index].base, "Signature")) {
+                	else if (!strcmp(jvm_class->constant_info[name_index].base, "Signature")) {
                         	show_class_info("parse Signature:\n");
                 	}
+                	else if (!strcmp(jvm_class->constant_info[name_index].base, "Synthetic")) {
+                        	show_class_info("parse Synthetic:\n");
+                	}
+                	else if (!strcmp(jvm_class->constant_info[name_index].base, "Deprecated")) {
+                        	show_class_info("parse Deprecated:\n");
+                	}
+                	else if (!strcmp(jvm_class->constant_info[name_index].base, "RuntimeVisibleAnnotations")) {
+                        	show_class_info("parse RuntimeVisibleAnnotations:\n");
+                	}
+                	else if (!strcmp(jvm_class->constant_info[name_index].base, "RuntimeInvisibleAnnotations")) {
+                        	show_class_info("parse RuntimeInvisibleAnnotations:\n");
+                	}
+			else {
+				jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attributes.");
+				return -1;
+			}
 		}
 		
 		new_filed->name_base = jvm_class->constant_info[new_filed->name_index].base;
@@ -923,18 +939,18 @@ void print_stack_map(STACK_MAP_ATTR *stack_map)
 	}
 }
 
-int add_opcode(CLASS_CODE *code)
+int parse_opcode(CLASS_CODE *code)
 {
         CLASS_READ_U4(code->code_length, p_mem)
         show_class_info("\tcode_length: %d\n", code->code_length);
 
-        code->code = (u1 *)malloc(code->code_length + 1);
-        if (!code->code) {
-                __error("Malloc failed.");
+        code->op_code = (u1 *)malloc(code->code_length + 1);
+        if (!code->op_code) {
+                jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
                 return -1;
         }
-        memcpy(code->code, p_mem, code->code_length);
-        code->code[code->code_length] = '\0';
+        memcpy(code->op_code, p_mem, code->code_length);
+        code->op_code[code->code_length] = '\0';
         p_mem += code->code_length;
 
 	return 0;
@@ -949,7 +965,7 @@ int init_method_stack(CLASS_CODE *code)
 			(int)code->max_locals * sizeof(int);
 	stack_base = (char *)malloc(stack_size);
 	if (!stack_base) {
-		__error("malloc failed.");
+		jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
 		return -1;
 	}
 	memset(stack_base, '\0', stack_size);
@@ -979,7 +995,7 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
 
 	code = (CLASS_CODE *)malloc(sizeof(CLASS_CODE));
 	if (!code) {
-		__error("malloc failed.");
+		jvm_error(VM_ERROR_CLASS_FILE, "Malloc failed.");
 		return -1;
 	}
 	memset(code, '\0', sizeof(CLASS_CODE));
@@ -996,16 +1012,16 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
         CLASS_READ_U2(code->max_locals, p_mem)
         show_class_info("\tmax_locals: %d\n", code->max_locals);
 
-	if (add_opcode(code) == -1)
-		return -1;
+	if (parse_opcode(code) == -1)
+		goto out;	
 
 	if (init_method_stack(code) == -1)
-		return -1;
+		goto out;
 
         CLASS_READ_U2(code->exception_table_length, p_mem)
         show_class_info("\texception_table_length: %d\n", code->exception_table_length);
         if (__parse_exception_table(code, code->exception_table_length) == -1)
-		return -1;
+		goto out;
 
         CLASS_READ_U2(code->attributes_count, p_mem)
         show_class_info("\tattributes_count: %d\n", code->attributes_count);
@@ -1018,23 +1034,36 @@ int parse_code_attribute(CLASS *jvm_class, CLASS_METHOD *method, u2 name_index)
                 if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LineNumberTable")) {
                         show_class_info("\n\tparse LineNumberTable:\n");
                         if (__parse_line_number_table(code, attribute_name_index) == -1)
-				return -1;
+				goto out;
                 }
-                if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "StackMapTable")) {
+                else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "StackMapTable")) {
                         show_class_info("\n\tparse StackMapTable:\n");
                         if (__parse_stack_map_table(code, attribute_name_index) == -1)
-				return -1;
+				goto out;
                 }
-                if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LocalVariableTable")) {
-                        ;
+                else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LocalVariableTable")) {
+                        show_class_info("\n\tparse LocalVariableTable:\n");
                 }
-                if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LocalVariableTypeTable")) {
-                        ;
+                else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "LocalVariableTypeTable")) {
+                        show_class_info("\n\tparse LocalVariableTypeTable:\n");
                 }
+		else {
+			jvm_error(VM_ERROR_CLASS_FILE, "!JVM parse wrong attributes.");
+			return -1;
+		}
         }
 
 	method->code_attr = code;
-        return 0;
+	return 0;
+
+out:
+	if (code->stack_frame.local_var_table)
+		free(code->stack_frame.local_var_table);
+	if (code->op_code)
+		free(code->op_code);
+	if (code)
+		free(code);
+        return -1;
 }
 
 int parse_exception_attribute(CLASS_METHOD *method, u2 index)
@@ -1121,7 +1150,7 @@ int parse_class_method(CLASS *jvm_class)
 		show_class_info("\n--------%d-----------\n", idx);
 		new_method = (CLASS_METHOD *)malloc(sizeof(CLASS_METHOD));
 		if (!new_method) {
-			__error("malloc failed.");
+			jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
 			return -1;
 		}
 
@@ -1141,7 +1170,7 @@ int parse_class_method(CLASS *jvm_class)
 		for (count = 0; count < new_method->attributes_count; count++) {
                 	CLASS_READ_U2(name_index, p_mem)
                 	show_class_info("attritbutes name_index: %d\n", name_index);
-			show_class_info("!%s\n", jvm_class->constant_info[name_index].base);
+			//show_class_info("!%s\n", jvm_class->constant_info[name_index].base);
 
                 	if (!strcmp(jvm_class->constant_info[name_index].base, "Code")) {
                         	show_class_info("parse code attribute:\n");
@@ -1166,9 +1195,6 @@ int parse_class_method(CLASS *jvm_class)
                         	if (parse_deprecated_attribute(new_method, name_index) == -1)
 					return -1;
                 	}
-                	else if (!strcmp(jvm_class->constant_info[name_index].base, "Deprecated")) {
-				show_class_info("parse Deprecated attribute:\n");
-                	}
                 	else if (!strcmp(jvm_class->constant_info[name_index].base, 
 				"untimeVisibleAnnotations")) {
 				show_class_info("parse untimeVisibleAnnotations attribute:\n");
@@ -1189,7 +1215,7 @@ int parse_class_method(CLASS *jvm_class)
 				show_class_info("parse AnnotationDefault attribute:\n");
                 	}
 			else {
-				show_class_info("error attribute.\n");
+				jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attributes.");
 				return -1;
 			}
 		}
@@ -1236,6 +1262,7 @@ int parse_class_attribute(CLASS *jvm_class)
 	for (idx = 0; idx < jvm_class->attributes_count; idx++) {
         	CLASS_READ_U2(attribute_name_index, p_mem)
         	show_class_info("%d attributes_name_index: %d\n", idx, attribute_name_index);
+		show_class_info(jvm_class->constant_info[attribute_name_index].base);
 
 		if (attribute_name_index < 1 && 
 			attribute_name_index >= jvm_class->constant_pool_count) {
@@ -1276,6 +1303,13 @@ int parse_class_attribute(CLASS *jvm_class)
 		}
 		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "BootstrapMethods")) {
 			show_class_info("parse attribute BootstrapMethods.\n");
+		}
+		else {
+			char err_buf[128];
+
+			snprintf(err_buf, 128, "JVM wrong attriubtes: %s", 
+				jvm_class->constant_info[attribute_name_index].base);
+			jvm_warning(VM_ERROR_CLASS_FILE, err_buf);
 		}
 	}
 }

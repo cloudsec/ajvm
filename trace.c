@@ -106,7 +106,7 @@ void signal_handler(int sig_num, siginfo_t *sig_info, void *ptr)
         int flag = 0, first_bp = 0;
 
 	assert(sig_info != NULL);
-        printf("\nPid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n", 
+        printf("\n\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n", 
 		getpid(), sig_info->si_addr, 
 		sig_info->si_signo, sig_info->si_errno);
 
@@ -167,7 +167,7 @@ void calltrace(void)
 		if (flag == 1) {
 			if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
 				__error("calltrace: search symbol failed.");
-				exit(-1);
+				continue;
 			}
 
 			prev_trace.rip = rip - 5;
@@ -179,7 +179,7 @@ void calltrace(void)
 		else {
 			if (search_symbol_by_addr(real_rip, &trace) == -1) {
 				__error("calltrace: search symbol failed.");
-				exit(-1);
+				continue;
 			}
 			trace.rip = rip - 5;
 			flag = 1;

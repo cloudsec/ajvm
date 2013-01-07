@@ -14,12 +14,15 @@
 #include "list.h"
 #include "log.h"
 
+extern int disass_bytecode(struct list_head *list_head);
+
 void jvm_usage(const char *proc)
 {
         fprintf(stdout, "usage: %s <option>\n\n", proc);
 	fprintf(stdout, "option:\n");
 	fprintf(stdout, "-p [class_path]\t\tInterpt java bytecode.\n");
 	fprintf(stdout, "-s [class_name]\t\tDisplay class file info.\n");
+	fprintf(stdout, "-d [class_name]\t\tDisassember class file.\n");
 	fprintf(stdout, "-v\t\t\tShow jvm version.\n");
 }
 
@@ -57,6 +60,25 @@ int show_jvm_class(JVM_ARG *arg)
 		calltrace_exit();
                 return -1;
 	}
+
+	return 0;
+}
+
+int disass_jvm_class(JVM_ARG *arg)
+{
+        struct list_head *s, *q;
+	CLASS *r;
+
+	arg->print_class = 0;
+	if (show_jvm_class(arg) == -1)
+		return -1;
+
+        list_for_each(q, (&jvm_class_list_head)) {
+                r = list_entry(q, CLASS, list);
+		if (r) {
+			disass_bytecode((&r->method_list_head));
+		}
+        }
 
 	return 0;
 }
@@ -127,7 +149,7 @@ int main(int argc, char **argv)
 	if (jvm_arg_init() == -1)
 		return -1;
 
-	while ((c = getopt(argc, argv, "p:s:v")) != -1) {
+	while ((c = getopt(argc, argv, "p:s:d:v")) != -1) {
 		switch (c) {
 		case 'p':
 			memset(jvm_arg->class_path, '\0', 1024);
@@ -135,6 +157,11 @@ int main(int argc, char **argv)
 			break;
 		case 's':
 			jvm_arg->print_class = 1;
+			memset(jvm_arg->class_path, '\0', 1024);
+			strcpy(jvm_arg->class_path, optarg);
+			break;
+		case 'd':
+			jvm_arg->disass_class = 1;
 			memset(jvm_arg->class_path, '\0', 1024);
 			strcpy(jvm_arg->class_path, optarg);
 			break;
@@ -152,6 +179,11 @@ int main(int argc, char **argv)
 
 	if (jvm_arg->print_class) {
 		show_jvm_class(jvm_arg);
+		return 0;
+	}
+	
+	if (jvm_arg->disass_class) {
+		disass_jvm_class(jvm_arg);
 		return 0;
 	}
 

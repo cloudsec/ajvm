@@ -261,7 +261,7 @@ typedef struct code_attr {
         u2 exception_table_length;
         u2 attributes_count;
 	u4 code_length;
-        u1 *code;
+        u1 *op_code;
 	EXCEPTION_TABLE *exception_table;
 	LINE_NUMBER_TABLE_ATTR *table_attr;
 	STACK_MAP_ATTR *stack_map_attr;
@@ -337,6 +337,7 @@ typedef struct jvm_pc_st {
 
 typedef struct jvm_arg {
 	int print_class;
+	int disass_class;
 	char class_path[1024];
 }JVM_ARG;
 
