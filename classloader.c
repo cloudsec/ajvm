@@ -46,7 +46,8 @@ int mmap_class_file(const char *class_file)
         class_file_len = f_stat.st_size;
         __debug2("%s file len: %d\n", class_file, class_file_len);
 
-        class_start_mem = mmap(NULL, class_file_len, PROT_READ, MAP_PRIVATE, class_fd, 0);
+        class_start_mem = mmap(NULL, class_file_len, PROT_READ, MAP_PRIVATE, 
+				class_fd, 0);
         if (!class_start_mem) {
 		__error("mmap failed."); 
 		close(class_fd);
@@ -1202,6 +1203,83 @@ int parse_class_method(CLASS *jvm_class)
         return 0;
 }
 
+int parse_attribute_sourcefile(CLASS *jvm_class)
+{
+	u4 attribute_length, idx;
+	u2 sourcefile_index;
+
+       	CLASS_READ_U4(attribute_length, p_mem)
+       	show_class_info("\tattributes_length: %d\n", attribute_length);
+
+       	CLASS_READ_U2(sourcefile_index, p_mem)
+       	show_class_info("\tsourcefile_index: %d\n", sourcefile_index);
+
+	if (sourcefile_index < 1 && 
+		sourcefile_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong sourcefile_index");
+		return -1;
+	}
+		
+	show_class_info("\t%s\n", jvm_class->constant_info[sourcefile_index].base);
+	return 0;
+}
+
+int parse_class_attribute(CLASS *jvm_class)
+{
+	u2 attribute_name_index;
+        u2 idx;
+
+        show_class_info("\n---------------parse class attributes-------------------------:\n\n");
+        CLASS_READ_U2(jvm_class->attributes_count, p_mem)
+        show_class_info("attributes_count: %d\n\n", jvm_class->attributes_count);
+
+	for (idx = 0; idx < jvm_class->attributes_count; idx++) {
+        	CLASS_READ_U2(attribute_name_index, p_mem)
+        	show_class_info("%d attributes_name_index: %d\n", idx, attribute_name_index);
+
+		if (attribute_name_index < 1 && 
+			attribute_name_index >= jvm_class->constant_pool_count) {
+			jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attribute SourceFile");
+			return -1;
+		}
+		
+		if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "SourceFile")) {
+			show_class_info("parse attribute SourceFile.\n");
+			if (parse_attribute_sourcefile(jvm_class) == -1) {
+				jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attribute SourceFile");
+				return -1;
+			}
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "InnerClasses")) {
+			show_class_info("parse attribute InnerClasses.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "EnclosingMethod")) {
+			show_class_info("parse attribute EnclosingMethod.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "Synthetic")) {
+			show_class_info("parse attribute Synthetic.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "Signature")) {
+			show_class_info("parse attribute Signature.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "SourceDebugExtension")) {
+			show_class_info("parse attribute SourceDebugExtension.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "Deprecated")) {
+			show_class_info("parse attribute Deprecated.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "RuntimeVisibleAnnotations")) {
+			show_class_info("parse attribute RuntimeVisibleAnnotations.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "RuntimeInvisibleAnnotations")) {
+			show_class_info("parse attribute RuntimeInvisibleAnnotations.\n");
+		}
+		else if (!strcmp(jvm_class->constant_info[attribute_name_index].base, "BootstrapMethods")) {
+			show_class_info("parse attribute BootstrapMethods.\n");
+		}
+	}
+}
+
 CLASS_FILED *lookup_class_filed(struct list_head *list_head, char *class_name, 
 		char *method_name)
 {
@@ -1347,6 +1425,9 @@ CLASS *jvm_parse_class_file(const char *class_file, const char *class_name)
 
         if (parse_class_method(new_class) == -1)
                 goto out;
+
+	if (parse_class_attribute(new_class) == -1)
+		goto out;
 
 	list_add_tail(&(new_class->list), &jvm_class_list_head);
         mmap_exit();

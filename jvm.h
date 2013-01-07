@@ -317,6 +317,7 @@ typedef struct jvm_class {
 	struct list_head interface_list_head;
         struct list_head filed_list_head;
         struct list_head method_list_head;
+	u2 attributes_count;
 	struct list_head list;
 }CLASS;
 
