@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2012, 2013 wzt		http://www.cloud-sec.org
+ *
+ * interp_engine.c
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2,
+ * or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,22 +99,58 @@
 
 #define set_local_table_arg(jvm_stack, type, index, value)                              \
         do {                                                                            \
-                print_local(jvm_stack);                                                          \
+                print_local(jvm_stack);                                                 \
                 *(type *)(jvm_stack->local_var_table + index * sizeof(type)) = value;	\
-                print_local(jvm_stack);                                                          \
+                print_local(jvm_stack);                                                 \
         } while(0);
 
+#ifdef VM_DEBUG
 void print_local(JVM_STACK_FRAME *jvm_stack)
 {
 	int i;
 
 	printf("#local: ");
 	for (i = 0; i < jvm_stack->max_locals; i++)
-		printf("0x%x ", *(int *)(jvm_stack->local_var_table + i * sizeof(int)));
+		printf("%d ", *(int *)(jvm_stack->local_var_table + i * sizeof(int)));
 	printf("\t#stack: ");
 	for (i = 0; i < jvm_stack->max_stack; i++)
-		printf("0x%x ", *(int *)(jvm_stack->operand_stack + i * sizeof(int)));
+		printf("%d ", *(int *)(jvm_stack->operand_stack + i * sizeof(int)));
 	printf("\n");
+}
+#else
+void print_local(JVM_STACK_FRAME *jvm_stack)
+{
+}
+#endif
+
+#ifdef VM_DEBUG
+void debug_vm_interp(char *fmt, ...)
+{
+	va_list arg;
+	char buf[256];
+
+	va_start(arg, fmt);
+	vsprintf(buf, fmt, arg);
+	va_end(arg);
+
+	printf("%s", buf);
+}
+#else
+void debug_vm_interp(char *fmt, ...)
+{
+}
+#endif
+
+void show_disassember_code(char *fmt, ...)
+{
+        va_list arg;
+        char buf[256];
+
+        va_start(arg, fmt);
+        vsprintf(buf, fmt, arg);
+        va_end(arg);
+
+        printf("%s", buf);
 }
 
 int jvm_interp_nop(u2 len, char *symbol, void *base)
@@ -103,7 +159,10 @@ int jvm_interp_nop(u2 len, char *symbol, void *base)
 		printf("%s\n", symbol);
 		return 0;
 	}
+	debug_vm_interp("%s\n", symbol);
 	jvm_pc.pc += len;
+
+	return 0;
 }
 
 int jvm_interp_aconst_null(u2 len, char *symbol, void *base)
@@ -112,158 +171,110 @@ int jvm_interp_aconst_null(u2 len, char *symbol, void *base)
 		printf("%s\n", symbol);
 		return 0;
 	}
+
+	debug_vm_interp("%s\n", symbol);
+	jvm_pc.pc += len;
+
+	return 0;
 }
+
+#define JVM_INTERP_PUSH_CONST(type, value, fmt, ...)			\
+	do {								\
+        	if (jvm_arg->disass_class) {				\
+			show_disassember_code(fmt, ##__VA_ARGS__);	\
+                	return 0;					\
+        	}							\
+        	debug_vm_interp(fmt, ##__VA_ARGS__);			\
+        	push_operand_stack(type, value)				\
+        	jvm_pc.pc += len;					\
+		return 0;						\
+	} while (0);
 
 int jvm_interp_iconst_m1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(int, -1, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_0(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-	push_operand_stack(int, 0)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 0, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        push_operand_stack(int, 1)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 1, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_2(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        push_operand_stack(int, 2)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 2, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_3(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        push_operand_stack(int, 3)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 3, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_4(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        push_operand_stack(int, 4)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 4, "%s\n", symbol)
 }
 
 int jvm_interp_iconst_5(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        push_operand_stack(int, 5)
-        jvm_pc.pc += len;
+	JVM_INTERP_PUSH_CONST(int, 5, "%s\n", symbol)
 }
 
 int jvm_interp_lconst_0(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(long, 0, "%s\n", symbol)
 }
 
 int jvm_interp_lconst_1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(long, 1, "%s\n", symbol)
 }
 
 int jvm_interp_fconst_0(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(float, 0, "%s\n", symbol)
 }
 
 int jvm_interp_fconst_1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(float, 1, "%s\n", symbol)
 }
 
 int jvm_interp_fconst_2(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(float, 2, "%s\n", symbol)
 }
 
 int jvm_interp_dconst_0(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(double, 0, "%s\n", symbol)
 }
 
 int jvm_interp_dconst_1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_PUSH_CONST(double, 1, "%s\n", symbol)
 }
 
 int jvm_interp_bipush(u2 len, char *symbol, void *base)
 {
-	u1 tmp;
+	u1 value;
 
-	tmp = *(u1 *)(base + 1);
-	if (jvm_arg->disass_class) {
-		printf("%s %d\n", symbol, tmp);
-		return 0;
-	}
-
-	push_operand_stack(int, (int)tmp)
-	jvm_pc.pc += len;
+	value = *(u1 *)(base + 1);
+	JVM_INTERP_PUSH_CONST(int, value, "%s %d\n", symbol, value)
 }
 
 int jvm_interp_sipush(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s %x\n", symbol, base + 1);
-		return 0;
-	}
+	u1 tmp1, tmp2;
+	u4 value;
+
+	value = (u4)(((*(u1 *)(base + 1)) << 8) | (*(u1 *)(base + 2)));
+	JVM_INTERP_PUSH_CONST(int, value, "%s %d\n", symbol, value)
 }
 
 int jvm_interp_ldc(u2 len, char *symbol, void *base)
@@ -290,12 +301,29 @@ int jvm_interp_ldc2_w(u2 len, char *symbol, void *base)
 	}
 }
 
+#define INTERP_LOAD_VAR(type, index, fmt, ...)                          \
+        do {                                                            \
+                u4 tmp;                                                 \
+                                                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                get_local_table(tmp, type, index)                       \
+                push_operand_stack(type, tmp)                           \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
+
+
 int jvm_interp_iload(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-		printf("%s %x\n", symbol, base + 1);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	INTERP_LOAD_VAR(int, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_lload(u2 len, char *symbol, void *base)
@@ -332,58 +360,22 @@ int jvm_interp_aload(u2 len, char *symbol, void *base)
 
 int jvm_interp_iload_0(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-	get_local_table(tmp, int, 0)
-	push_operand_stack(int, tmp)
-        jvm_pc.pc += len;
+	INTERP_LOAD_VAR(int, 0, "%s\n", symbol)
 }
 
 int jvm_interp_iload_1(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        get_local_table(tmp, int, 1)
-        push_operand_stack(int, tmp)
-        jvm_pc.pc += len;
+	INTERP_LOAD_VAR(int, 1, "%s\n", symbol)
 }
 
 int jvm_interp_iload_2(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        get_local_table(tmp, int, 2)
-        push_operand_stack(int, tmp)
-        jvm_pc.pc += len;
+	INTERP_LOAD_VAR(int, 2, "%s\n", symbol)
 }
 
 int jvm_interp_iload_3(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        get_local_table(tmp, int, 3)
-        push_operand_stack(int, tmp)
-        jvm_pc.pc += len;
+	INTERP_LOAD_VAR(int, 3, "%s\n", symbol)
 }
 
 int jvm_interp_lload_0(u2 len, char *symbol, void *base)
@@ -602,172 +594,141 @@ int jvm_interp_saload(u2 len, char *symbol, void *base)
 	}
 }
 
+#define JVM_INTERP_STORE_CONST(type, index, fmt, ...)                   \
+        do {                                                            \
+                u4 tmp;                                                 \
+                                                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp)                            \
+                set_local_table(type, index, tmp)                       \
+                jvm_pc.pc += len;                                       \
+                                                                        \
+                return 0;                                               \
+        } while (0);
+
 int jvm_interp_istore(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	JVM_INTERP_STORE_CONST(int, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_lstore(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	JVM_INTERP_STORE_CONST(long, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_fstore(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	JVM_INTERP_STORE_CONST(float, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_dstore(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	JVM_INTERP_STORE_CONST(double, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_astore(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	u1 index;
+
+	index = *(u1 *)(base + 1);
+	JVM_INTERP_STORE_CONST(int, index, "%s %d\n", symbol, index)
 }
 
 int jvm_interp_istore_0(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        pop_operand_stack(int, tmp)
-        set_local_table(int, 1, tmp)
-        jvm_pc.pc += len;
+	JVM_INTERP_STORE_CONST(int, 0, "%s\n", symbol)
 }
 
 int jvm_interp_istore_1(u2 len, char *symbol, void *base)
 {
-	u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-	pop_operand_stack(int, tmp)
-	set_local_table(int, 1, tmp)
-	jvm_pc.pc += len;
+	JVM_INTERP_STORE_CONST(int, 1, "%s\n", symbol)
 }
 
 int jvm_interp_istore_2(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        pop_operand_stack(int, tmp)
-        set_local_table(int, 2, tmp)
-        jvm_pc.pc += len;
+	JVM_INTERP_STORE_CONST(int, 2, "%s\n", symbol)
 }
 
 int jvm_interp_istore_3(u2 len, char *symbol, void *base)
 {
-        u4 tmp;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        pop_operand_stack(int, tmp)
-        set_local_table(int, 3, tmp)
-        jvm_pc.pc += len;
+	JVM_INTERP_STORE_CONST(int, 3, "%s\n", symbol)
 }
 
 int jvm_interp_lstore_0(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_STORE_CONST(long, 0, "%s\n", symbol)
 }
 
 int jvm_interp_lstore_1(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_STORE_CONST(long, 1, "%s\n", symbol)
 }
 
 int jvm_interp_lstore_2(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_STORE_CONST(long, 2, "%s\n", symbol)
 }
 
 int jvm_interp_lstore_3(u2 len, char *symbol, void *base)
 {
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
+	JVM_INTERP_STORE_CONST(long, 3, "%s\n", symbol)
 }
 
 int jvm_interp_fstore_0(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(float, 3, "%s\n", symbol)
 }
 
 int jvm_interp_fstore_1(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(float, 1, "%s\n", symbol)
 }
 
 int jvm_interp_fstore_2(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(float, 2, "%s\n", symbol)
 }
 
 int jvm_interp_fstore_3(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(float, 3, "%s\n", symbol)
 }
 
 int jvm_interp_dstore_0(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(double, 0, "%s\n", symbol)
 }
 
 int jvm_interp_dstore_1(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(double, 1, "%s\n", symbol)
 }
 
 int jvm_interp_dstore_2(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(double, 2, "%s\n", symbol)
 }
 
 int jvm_interp_dstore_3(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_STORE_CONST(double, 3, "%s\n", symbol)
 }
 
 int jvm_interp_astore_0(u2 len, char *symbol, void *base)
@@ -921,106 +882,148 @@ int jvm_interp_swap(u2 len, char *symbol, void *base)
         printf("%s\n", symbol);
 }
 
+#define JVM_INTERP_ADD(type, fmt, ...)					\
+	do {								\
+        	type tmp1, tmp2;					\
+        	if (jvm_arg->disass_class) {				\
+			show_disassember_code(fmt, ##__VA_ARGS__);	\
+                	return 0;					\
+        	}							\
+									\
+        	debug_vm_interp(fmt, ##__VA_ARGS__);			\
+		pop_operand_stack(type, tmp1)				\
+		pop_operand_stack(type, tmp2)				\
+        	push_operand_stack(type, (tmp1 + tmp2))			\
+        	jvm_pc.pc += len;					\
+		return 0;						\
+	} while (0);
+
 int jvm_interp_iadd(u2 len, char *symbol, void *base)
 {
-        u4 tmp1, tmp2;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-	pop_operand_stack(int, tmp1)
-	pop_operand_stack(int, tmp2)
-
-	push_operand_stack(int, (tmp1 + tmp2))
-	jvm_pc.pc += len;
+	JVM_INTERP_ADD(int, "%s\n", symbol)
 }
 
 int jvm_interp_ladd(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_ADD(long, "%s\n", symbol)
 }
 
 int jvm_interp_fadd(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_ADD(float, "%s\n", symbol)
 }
 
 int jvm_interp_dadd(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_ADD(double, "%s\n", symbol)
 }
+
+#define JVM_INTERP_SUB(type, fmt, ...)  	 	                \
+        do {                                                            \
+                type tmp1, tmp2;                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp2 - tmp1))                 \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
 
 int jvm_interp_isub(u2 len, char *symbol, void *base)
 {
-        u4 tmp1, tmp2;
-
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-
-        pop_operand_stack(int, tmp1)
-        pop_operand_stack(int, tmp2)
-
-        push_operand_stack(int, (tmp2 - tmp1))
-        jvm_pc.pc += len;
+	JVM_INTERP_SUB(int, "%s\n", symbol)
 }
 
 int jvm_interp_lsub(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_SUB(long, "%s\n", symbol)
 }
 
 int jvm_interp_fsub(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_SUB(float, "%s\n", symbol)
 }
 
 int jvm_interp_dsub(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_SUB(double, "%s\n", symbol)
 }
+
+#define JVM_INTERP_MUL(type, fmt, ...)                                  \
+        do {                                                            \
+                type tmp1, tmp2;                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp2 * tmp1))                 \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
 
 int jvm_interp_imul(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_MUL(int, "%s\n", symbol)
 }
 
 int jvm_interp_lmul(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_MUL(long, "%s\n", symbol)
 }
 
 int jvm_interp_fmul(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_MUL(float, "%s\n", symbol)
 }
 
 int jvm_interp_dmul(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_MUL(double, "%s\n", symbol)
 }
+
+#define JVM_INTERP_DIV(type, fmt, ...)                                  \
+        do {                                                            \
+                type tmp1, tmp2; 	                                \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp2 / tmp1))		        \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
 
 int jvm_interp_idiv(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_DIV(int, "%s\n", symbol)
 }
 
 int jvm_interp_ldiv(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_DIV(long, "%s\n", symbol)
 }
 
 int jvm_interp_fdiv(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_DIV(float, "%s\n", symbol)
 }
 
 int jvm_interp_ddiv(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_DIV(double, "%s\n", symbol)
 }
 
 int jvm_interp_irem(u2 len, char *symbol, void *base)
@@ -1043,24 +1046,40 @@ int jvm_interp_drem(u2 len, char *symbol, void *base)
         printf("%s\n", symbol);
 }
 
+#define JVM_INTERP_NEG(type, fmt, ...) 	                                \
+        do {                                                            \
+                type tmp;	                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp)                            \
+                push_operand_stack(type, ((~tmp) + 1))	                \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
+
+
 int jvm_interp_ineg(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_NEG(int, "%s\n", symbol)
 }
 
 int jvm_interp_lneg(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	JVM_INTERP_NEG(long, "%s\n", symbol)
 }
 
 int jvm_interp_fneg(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	//JVM_INTERP_NEG(float, "%s\n", symbol)
 }
 
 int jvm_interp_dneg(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+	//JVM_INTERP_NEG(double, "%s\n", symbol)
 }
 
 int jvm_interp_ishl(u2 len, char *symbol, void *base)
@@ -1093,51 +1112,101 @@ int jvm_interp_lushr(u2 len, char *symbol, void *base)
         printf("%s\n", symbol);
 }
 
+#define JVM_INTERP_AND(type, fmt, ...)                                  \
+        do {                                                            \
+                type tmp1, tmp2;                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp1 & tmp2))                 \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
+
 
 int jvm_interp_iand(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_AND(int, "%s\n", symbol)
 }
 
 int jvm_interp_land(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_AND(long, "%s\n", symbol)
 }
+
+#define JVM_INTERP_OR(type, fmt, ...)                                   \
+        do {                                                            \
+                type tmp1, tmp2;                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp1 | tmp2))                 \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
 
 int jvm_interp_ior(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_OR(int, "%s\n", symbol);
 }
 
 int jvm_interp_lor(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_OR(long, "%s\n", symbol);
 }
+
+#define JVM_INTERP_XOR(type, fmt, ...)                                   \
+        do {                                                            \
+                type tmp1, tmp2;                                        \
+                if (jvm_arg->disass_class) {                            \
+                        show_disassember_code(fmt, ##__VA_ARGS__);      \
+                        return 0;                                       \
+                }                                                       \
+                                                                        \
+                debug_vm_interp(fmt, ##__VA_ARGS__);                    \
+                pop_operand_stack(type, tmp1)                           \
+                pop_operand_stack(type, tmp2)                           \
+                push_operand_stack(type, (tmp1 | tmp2))                 \
+                jvm_pc.pc += len;                                       \
+                return 0;                                               \
+        } while (0);
+
 
 int jvm_interp_ixor(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_XOR(int, "%s\n", symbol);
 }
 
 int jvm_interp_lxor(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_XOR(long, "%s\n", symbol);
 }
 
 int jvm_interp_iinc(u2 len, char *symbol, void *base)
 {
-	u2 index, value;
+	u1 index, value;
 	u4 tmp;
 
 	index = *(u1 *)(base + 1);
 	value = *(u1 *)(base + 2);
 	if (jvm_arg->disass_class) {
-        	printf("%s %d %d\n", symbol, index, value);
+        	show_disassember_code("%s %d %d\n", symbol, index, value);
 		return 0;
 	}
 
+       	debug_vm_interp("%s %d %d\n", symbol, index, value);
 	get_local_table(tmp, int, index)
-	tmp += len;
+	tmp += value;
 	set_local_table(int, index, tmp)
         jvm_pc.pc += len;
 }
@@ -1286,20 +1355,25 @@ int jvm_interp_if_icmplt(u2 len, char *symbol, void *base)
         printf("%s\n", symbol);
 }
 
+#define JVM_INTERP_IF_ICMP(type, symbol)			\
+       	type tmp1, tmp2;					\
+       	u2 tmp;							\
+								\
+       	tmp = (*(u1 *)(base + 1) << 8) | (*(u1 *)(base + 2));	\
+       	if (jvm_arg->disass_class) {				\
+		show_disassember_code("%s %d\n", symbol, tmp);  \
+               	return 0;					\
+       	}							\
+								\
+	debug_vm_interp("%s %d\n", symbol, tmp);		\
+       	pop_operand_stack(type, tmp2)				\
+       	pop_operand_stack(type, tmp1)				\
+		
+
 int jvm_interp_if_icmpge(u2 len, char *symbol, void *base)
 {
-        u4 tmp1, tmp2;
-	u2 tmp;
+	JVM_INTERP_IF_ICMP(int, symbol)
 
-	tmp = (*(u1 *)(base + 1) << 8) | (*(u1 *)(base + 2));
-	if (jvm_arg->disass_class) {
-	        printf("%s %d\n", symbol, tmp);
-		return 0;
-	}
-
-	pop_operand_stack(int, tmp2)
-	pop_operand_stack(int, tmp1)
-	
 	if (tmp1 >= tmp2) {
 		jvm_pc.pc += tmp;
 	}
@@ -1315,7 +1389,14 @@ int jvm_interp_if_icmpgt(u2 len, char *symbol, void *base)
 
 int jvm_interp_if_icmple(u2 len, char *symbol, void *base)
 {
-        printf("%s\n", symbol);
+        JVM_INTERP_IF_ICMP(int, symbol)
+
+        if (tmp1 <= tmp2) {
+                jvm_pc.pc += tmp;
+        }
+        else {
+                jvm_pc.pc += len;
+        }
 }
 
 int jvm_interp_if_acmpeq(u2 len, char *symbol, void *base)
@@ -1449,6 +1530,8 @@ int jvm_interp_return(u2 len, char *symbol, void *base)
 		return 0;
 	}
 
+	debug_vm_interp("%s\n", symbol);
+
 	return_addr = curr_jvm_stack->return_addr;
 	if (curr_jvm_stack->prev_stack)
         	curr_jvm_stack = curr_jvm_stack->prev_stack;
@@ -1463,6 +1546,7 @@ int jvm_interp_return(u2 len, char *symbol, void *base)
 	else {
                 jvm_pc.pc = return_addr;
 	}
+	return 0;
 }
 
 int jvm_interp_getstatic(u2 len, char *symbol, void *base)
@@ -2116,33 +2200,40 @@ void jvm_interp_env_exit(void)
 	free(curr_jvm_interp_env);
 }
 
+void show_method_code(CLASS_METHOD *method)
+{
+	u4 idx;
+
+	for (idx = 0; idx < method->code_attr->code_length; idx++)
+		debug_vm_interp("0x%x ", *(u1 *)(method->code_attr->op_code + idx));
+	debug_vm_interp("\n");
+}
+
 int interp_bytecode(CLASS_METHOD *method)
 {
 	u1 index, idx;
+	u4 pc_count = 1;
 
-	printf("%s\t%s\n", method->name_base, method->desc_base);
-	printf("stack: %d\tlocal: %d\n\n", method->code_attr->max_stack, 
-		method->code_attr->max_locals);
+	debug_vm_interp("%s\t%s\n", method->name_base, method->desc_base);
+	debug_vm_interp("stack: %d\tlocal: %d\n\n", method->code_attr->max_stack, 
+			method->code_attr->max_locals);
 
-	for (idx = 0; idx < method->code_attr->code_length; idx++)
-		printf("0x%x ", *(u1 *)(method->code_attr->op_code + idx));
-	printf("\n");
-
+	show_method_code(method);
 	jvm_stack_depth++;
 	curr_jvm_stack = &method->code_attr->stack_frame;
-	printf("#local: 0x%x\t#stack: 0x%x\n",	curr_jvm_stack->local_var_table,
-		curr_jvm_stack->operand_stack);
+	debug_vm_interp("#local: 0x%x\t#stack: 0x%x\n",	curr_jvm_stack->local_var_table,
+			curr_jvm_stack->operand_stack);
 
 	curr_jvm_interp_env->constant_info = method->class->constant_info;
 	curr_jvm_interp_env->prev_env = NULL;
 	for (;;) {
 		if (jvm_stack_depth == 0) {
-			printf("interpret bytecode done.\n");
+			debug_vm_interp("interpret bytecode done.\n");
 			break;
 		}
 
 		index = *(u1 *)jvm_pc.pc;
-		printf("#pc: 0x%x -> 0x%x\n", jvm_pc.pc, index);
+		debug_vm_interp("[%d] pc: 0x%x -> 0x%x\n", pc_count++, jvm_pc.pc, index);
 		jvm_byte_code[index].func(jvm_byte_code[index].opcode_len,
 			jvm_byte_code[index].symbol, jvm_pc.pc);
 		//sleep(1);

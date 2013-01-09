@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2012, 2013 wzt         http://www.cloud-sec.org
+ *
+ * jvm.c
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2,
+ * or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +40,7 @@ void jvm_usage(const char *proc)
 {
         fprintf(stdout, "usage: %s <option>\n\n", proc);
 	fprintf(stdout, "option:\n");
-	fprintf(stdout, "-p [class_path]\t\tInterpt java bytecode.\n");
+	fprintf(stdout, "-c [class_path]\t\tInterpt java bytecode.\n");
 	fprintf(stdout, "-s [class_name]\t\tDisplay class file info.\n");
 	fprintf(stdout, "-d [class_name]\t\tDisassember class file.\n");
 	fprintf(stdout, "-v\t\t\tShow jvm version.\n");
@@ -149,9 +169,9 @@ int main(int argc, char **argv)
 	if (jvm_arg_init() == -1)
 		return -1;
 
-	while ((c = getopt(argc, argv, "p:s:d:v")) != -1) {
+	while ((c = getopt(argc, argv, "c:s:d:v")) != -1) {
 		switch (c) {
-		case 'p':
+		case 'c':
 			memset(jvm_arg->class_path, '\0', 1024);
 			strcpy(jvm_arg->class_path, optarg);
 			break;

@@ -4,8 +4,10 @@
 #include "type.h"
 #include "list.h"
 
+#define VM_DEBUG
+
 #define JVM_VERSION					0.02
-#define JVM_BANNER					"(c) Zhitong Wang 2012"
+#define JVM_BANNER					"(c) wzt 2012,2013"
 
 #define JVM_CLASS_MAGIC                 		0xcafebabe
 
