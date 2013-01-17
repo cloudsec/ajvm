@@ -85,6 +85,17 @@
 #define ITEM_Object					7
 #define ITEM_Uninitialized				8
 
+#define ARG_BYTE					'B'
+#define ARG_CHAR					'C'
+#define ARG_DOUBLE					'D'
+#define ARG_FLOAT					'F'
+#define ARG_INT						'I'
+#define ARG_LONG					'J'
+#define ARG_REFERENCE					'L'
+#define ARG_SHORT					'S'
+#define ARG_BOOLEAN					'Z'
+#define ARG_ARRAY					'['
+
 typedef struct opcode_st {
 	int len;
 	char *base;
@@ -93,6 +104,7 @@ typedef struct opcode_st {
 
 struct constant_info_st {
 	u2 index;
+	u1 tag;
 	u1 *base;
 }__attribute__ ((packed));
 
@@ -173,6 +185,10 @@ typedef struct filed_info {
 	u1 *desc_base;
 	struct list_head list;
 	struct jvm_class *class;
+	union {
+		int value1;
+		long value2;
+	};
 }CLASS_FILED;
 
 typedef struct exception_table {
@@ -325,6 +341,7 @@ typedef struct jvm_class {
 
 typedef struct jvm_object {
 	int age;
+	int ref_count;
 	CLASS *class;
 }JVM_OBJECT;
 
@@ -372,5 +389,7 @@ CLASS_FILED *lookup_class_filed(struct list_head *list_head, char *class_name,
                 char *method_name);
 CLASS_FILED *lookup_class_filed(struct list_head *list_head, char *class_name,
                 char *method_name);
+
+int parse_synthetic_attribute(CLASS_METHOD *method, u2 index);
 
 #endif

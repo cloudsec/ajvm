@@ -52,6 +52,9 @@ void jvm_error(int flag, char *msg)
 	case VM_ERROR_MEMORY:
 		__error(msg);
 		break;
+	case VM_ERROR_INTERP:
+		__error(msg);
+		break;
 	default:
 		printf("VM Error: Unkown flag.\n");
 		break;

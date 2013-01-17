@@ -114,13 +114,13 @@ int jvm_init(JVM_ARG *arg, const char *class_name)
 	INIT_LIST_HEAD(&jvm_class_list_head);
         init_class_parse();
 
-        if (!jvm_load_class(arg->class_path, class_name))
-		return -1;
-
 	if (jvm_stack_init() == -1)
 		return -1;
 
 	if (jvm_interp_env_init() == -1)
+		return -1;
+
+        if (!jvm_load_class(arg->class_path, class_name))
 		return -1;
 
 	return 0;
@@ -135,10 +135,9 @@ int jvm_run(char *class_name)
 		printf("jvm not found method main().\n");
 		return -1;
 	}
-	printf("\njvm found method main().\n\n");
+	printf("jvm found method: main()\n");
 
 	jvm_pc_init(method);
-
 	if (interp_bytecode(method) == -1) {
 		printf("interp bytecode failed.\n");
 		return -1;
@@ -194,8 +193,6 @@ int main(int argc, char **argv)
 			return -1;
 		}
 	}
-
-	//print_jvm_arg();
 
 	if (jvm_arg->print_class) {
 		show_jvm_class(jvm_arg);

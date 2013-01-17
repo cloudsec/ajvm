@@ -407,7 +407,7 @@ BYTECODE jvm_byte_code[OPCODE_LEN] = {
                 {0xb0,  1,      "areturn",              jvm_interp_areturn},
                 {0xb1,  1,      "return",               jvm_interp_return},
                 {0xb2,  3,      "getstatic",            jvm_interp_getstatic},
-                {0xb3,  1,      "putstatic",            jvm_interp_putstatic},
+                {0xb3,  3,      "putstatic",            jvm_interp_putstatic},
                 {0xb4,  1,      "getfield",             jvm_interp_getfiled},
                 {0xb5,  3,      "putfield",             jvm_interp_putfiled},
                 {0xb6,  3,      "invokevirtual",        jvm_interp_invokevirtual},
