@@ -26,15 +26,25 @@
 #include "trace.h"
 #include "vm_error.h"
 
-void jvm_warning(int flag, char *msg)
+void jvm_warning(int flag, char *fmt, ...)
 {
+        va_list arg;
+	char buf[1024];
+
+        va_start(arg, fmt);
+        vsprintf(buf, fmt, arg);
+        va_end(arg);
+
         switch (flag) {
         case VM_ERROR_CLASS_FILE:
-                __error(msg);
+                printf("%s", buf);
                 break;
         case VM_ERROR_MEMORY:
-                __error(msg);
+                printf("%s", buf);
                 break;
+	case VM_ERROR_INTERP:
+                printf("%s", buf);
+		break;
         default:
                 printf("VM Error: Unkown flag.\n");
                 break;
@@ -43,17 +53,24 @@ void jvm_warning(int flag, char *msg)
 	calltrace();
 }
 
-void jvm_error(int flag, char *msg)
+void jvm_error(int flag, char *fmt, ...)
 {
+        va_list arg;
+	char buf[1024];
+
+        va_start(arg, fmt);
+        vsprintf(buf, fmt, arg);
+        va_end(arg);
+
 	switch (flag) {
 	case VM_ERROR_CLASS_FILE:
-		__error(msg);
+                printf("%s", buf);
 		break;
 	case VM_ERROR_MEMORY:
-		__error(msg);
+                printf("%s", buf);
 		break;
 	case VM_ERROR_INTERP:
-		__error(msg);
+                printf("%s", buf);
 		break;
 	default:
 		printf("VM Error: Unkown flag.\n");

@@ -248,7 +248,7 @@ BYTECODE jvm_byte_code[OPCODE_LEN] = {
                 {0x11,  3,      "sipush",               jvm_interp_sipush},
                 {0x12,  2,      "ldc",          	jvm_interp_ldc},
                 {0x13,  1,      "ldc_w",                jvm_interp_ldc_w},
-                {0x14,  1,      "ldc2_w",               jvm_interp_ldc2_w},
+                {0x14,  3,      "ldc2_w",               jvm_interp_ldc2_w},
                 {0x15,  2,      "iload",                jvm_interp_iload},
                 {0x16,  2,      "lload",                jvm_interp_lload},
                 {0x17,  2,      "fload",                jvm_interp_fload},

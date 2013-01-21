@@ -354,8 +354,8 @@ int handle_class_long(CLASS *jvm_class, u2 idx, u1 tag)
                 return -1;
         }
 
-        CLASS_READ_U2(long_info->high_bytes, p_mem);
-        CLASS_READ_U2(long_info->low_bytes, p_mem);
+        CLASS_READ_U4(long_info->high_bytes, p_mem);
+        CLASS_READ_U4(long_info->low_bytes, p_mem);
 
         show_class_info("high bytes: %d, low bytes: %d\n",
         	long_info->high_bytes, long_info->low_bytes);
@@ -476,6 +476,7 @@ int parse_class_constant(CLASS *jvm_class)
                 case CONSTANT_Long:
 			if (handle_class_long(jvm_class, idx, constant_tag) == -1)
 				return -1;
+			idx++;
                         break;
                 case CONSTANT_Integer:
 			if (handle_class_integer(jvm_class, idx, constant_tag) == -1)
@@ -488,6 +489,7 @@ int parse_class_constant(CLASS *jvm_class)
                 case CONSTANT_Double:
 			if (handle_class_double(jvm_class, idx, constant_tag) == -1)
 				return -1;
+			idx++;
                         break;
                 case CONSTANT_NameAndType:
 			if (handle_class_name_and_type(jvm_class, idx) == -1)
@@ -1024,8 +1026,8 @@ int init_method_stack(CLASS_CODE *code)
 	int stack_size = 0;
 	char *stack_base;
 
-	stack_size = (int)code->max_stack * sizeof(int) + 
-			(int)code->max_locals * sizeof(int);
+	stack_size = (int)code->max_stack * sizeof(void *) + 
+			(int)code->max_locals * sizeof(void *);
 	stack_base = (char *)malloc(stack_size);
 	if (!stack_base) {
 		jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
@@ -1035,7 +1037,7 @@ int init_method_stack(CLASS_CODE *code)
 	
 	code->stack_frame.local_var_table = (u1 *)stack_base;
 	code->stack_frame.operand_stack = 
-			(u1 *)(stack_base + (int)code->max_locals * sizeof(int));
+			(u1 *)(stack_base + (int)code->max_locals * sizeof(void *));
 	code->stack_frame.method = code->method;
 	code->stack_frame.return_addr = NULL;
 	code->stack_frame.offset = 0;

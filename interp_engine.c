@@ -37,14 +37,14 @@
 		print_local(curr_jvm_stack);						\
 		*(type *)(curr_jvm_stack->operand_stack + 				\
 			curr_jvm_stack->offset) = (type)value;				\	
-        	curr_jvm_stack->offset += sizeof(type);					\
+        	curr_jvm_stack->offset += sizeof(void *);				\
 		print_local(curr_jvm_stack);						\
 	} while(0);
 
 #define pop_operand_stack(type, value)							\
 	do {										\
 		print_local(curr_jvm_stack);						\
-	        curr_jvm_stack->offset -= sizeof(type);					\
+	        curr_jvm_stack->offset -= sizeof(void *);				\
         	value = *(type *)(curr_jvm_stack->operand_stack +			\
 			curr_jvm_stack->offset);					\
         	*(type *)(curr_jvm_stack->operand_stack +				\
@@ -55,27 +55,27 @@
 #define copy_operand_stack(type, value)							\
 	do {										\
 		print_local(curr_jvm_stack);                                            \
-                curr_jvm_stack->offset -= sizeof(type);                                 \
+                curr_jvm_stack->offset -= sizeof(void *);                               \
                 value = *(type *)(curr_jvm_stack->operand_stack +                       \
                         curr_jvm_stack->offset);                                        \
-		curr_jvm_stack->offset += sizeof(type);					\
+		curr_jvm_stack->offset += sizeof(void *);				\
                 *(type *)(curr_jvm_stack->operand_stack +                               \
                         curr_jvm_stack->offset) = (type)value;                          \
-                curr_jvm_stack->offset += sizeof(type);                                 \
+                curr_jvm_stack->offset += sizeof(void *);                               \
                 print_local(curr_jvm_stack);                                            \
         } while(0);
 
 #define get_local_table(value, type, index)						\
 	do {										\
 		print_local(curr_jvm_stack);						\
-		value = *(type *)(curr_jvm_stack->local_var_table + index * sizeof(type));\
+		value = *(type *)(curr_jvm_stack->local_var_table + index * sizeof(void *));\
 		print_local(curr_jvm_stack);						\
 	} while(0);
 		
 #define set_local_table(type, index, value)						\
 	do {										\
 		print_local(curr_jvm_stack);						\
-		*(type *)(curr_jvm_stack->local_var_table + index * sizeof(type)) = value;\
+		*(type *)(curr_jvm_stack->local_var_table + index * sizeof(void *)) = value;\
 		print_local(curr_jvm_stack);						\
 	} while(0);
 
@@ -83,14 +83,14 @@
         do {                                                                            \
                 print_local(jvm_stack);                                            	\
                 *(type *)(jvm_stack->operand_stack + jvm_stack->offset) = (type)value;  \
-                jvm_stack->offset += sizeof(type);  	                                \
+                jvm_stack->offset += sizeof(void *);  	                                \
                 print_local(jvm_stack);                  	                        \
         } while(0);
 
 #define pop_operand_stack_arg(jvm_stack, type, value)                                   \
         do {                                                                            \
                 print_local(jvm_stack);                                                 \
-                jvm_stack->offset -= sizeof(type);                                 	\
+                jvm_stack->offset -= sizeof(void *);                                 	\
                 value = *(type *)(jvm_stack->operand_stack + jvm_stack->offset);        \
                 *(type *)(jvm_stack->operand_stack + jvm_stack->offset) = '\0';         \
                 print_local(jvm_stack);                                                 \
@@ -100,7 +100,7 @@
 #define set_local_table_arg(jvm_stack, type, index, value)                              \
         do {                                                                            \
                 print_local(jvm_stack);                                                 \
-                *(type *)(jvm_stack->local_var_table + index * sizeof(type)) = value;	\
+                *(type *)(jvm_stack->local_var_table + index * sizeof(void *)) = value;	\
                 print_local(jvm_stack);                                                 \
         } while(0);
 
@@ -111,10 +111,10 @@ void print_local(JVM_STACK_FRAME *jvm_stack)
 
 	printf("#local: ");
 	for (i = 0; i < jvm_stack->max_locals; i++)
-		printf("0x%x ", *(int *)(jvm_stack->local_var_table + i * sizeof(int)));
+		printf("0x%x ", *(int *)(jvm_stack->local_var_table + i * sizeof(void *)));
 	printf("\t#stack: ");
 	for (i = 0; i < jvm_stack->max_stack; i++)
-		printf("0x%x ", *(int *)(jvm_stack->operand_stack + i * sizeof(int)));
+		printf("0x%x ", *(int *)(jvm_stack->operand_stack + i * sizeof(void *)));
 	printf("\n");
 }
 #else
@@ -295,10 +295,28 @@ int jvm_interp_ldc_w(u2 len, char *symbol, void *base)
 
 int jvm_interp_ldc2_w(u2 len, char *symbol, void *base)
 {
+	u1 tmp1, tmp2;
+	u2 index;
+	int high_bytes, low_bytes;
+	long value;
+
+	index = (u2)(((*(u1 *)(base + 1)) << 8) | (*(u1 *)(base + 2)));
 	if (jvm_arg->disass_class) {
-		printf("%s %x %x\n", symbol, base + 1, base + 3);
+		show_disassember_code("%s #%x\n", symbol, index);
 		return 0;
 	}
+	
+	debug_vm_interp("%s #%x\n", symbol, index);
+        high_bytes = ((struct CONSTANT_Long_info *)
+                        curr_jvm_interp_env->constant_info[index].base)->high_bytes;
+        low_bytes = ((struct CONSTANT_Long_info *)
+                        curr_jvm_interp_env->constant_info[index].base)->low_bytes;
+
+	value = ((long)high_bytes << 32) + low_bytes;
+	push_operand_stack(long, value)
+
+	jvm_pc.pc += len;
+	return 0;
 }
 
 #define INTERP_LOAD_VAR(type, index, fmt, ...)                          \
@@ -1505,6 +1523,7 @@ int jvm_interp_return(u2 len, char *symbol, void *base)
 		tmp_env = curr_jvm_interp_env->prev_env;
 		memcpy(curr_jvm_interp_env, tmp_env, sizeof(JVM_INTERP_ENV));
 		free(tmp_env);
+	}
 
 	jvm_stack_depth--;
 	if (jvm_stack_depth == 0) {
@@ -2267,8 +2286,8 @@ int compute_stack_size(struct list_head *list_head)
         list_for_each(s, list_head) {
                 p = list_entry(s, CLASS_METHOD, list);
 		if (p && p->code_attr) {
-			size += (int)p->code_attr->max_stack * sizeof(int);
-			size += (int)p->code_attr->max_locals * sizeof(int);
+			size += (int)p->code_attr->max_stack * sizeof(void *);
+			size += (int)p->code_attr->max_locals * sizeof(void *);
 		}
 	}
 

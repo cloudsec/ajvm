@@ -5,7 +5,7 @@
 #define VM_ERROR_MEMORY			1
 #define VM_ERROR_INTERP			2
 
-void jvm_warning(int flag, char *msg);
-void jvm_error(int flag, char *msg);
+void jvm_warning(int flag, char *fmt, ...);
+void jvm_error(int flag, char *fmt, ...);
 
 #endif
