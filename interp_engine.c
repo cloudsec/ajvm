@@ -1482,19 +1482,29 @@ int jvm_interp_areturn(u2 len, char *symbol, void *base)
 int jvm_interp_return(u2 len, char *symbol, void *base)
 {
 	u1 *return_addr;
+
 	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
+        	show_disassember_code("%s\n", symbol);
 		return 0;
 	}
 
 	debug_vm_interp("%s\n", symbol);
 
 	return_addr = curr_jvm_stack->return_addr;
-	if (curr_jvm_stack->prev_stack)
-        	curr_jvm_stack = curr_jvm_stack->prev_stack;
+	if (curr_jvm_stack->prev_stack) {
+		JVM_STACK_FRAME *tmp_frame;
+
+        	tmp_frame = curr_jvm_stack->prev_stack;
+		memcpy(curr_jvm_stack, tmp_frame, sizeof(JVM_STACK_FRAME));
+		free(tmp_frame);
+	}
         print_local(curr_jvm_stack);
-	if (curr_jvm_interp_env->prev_env)
-		curr_jvm_interp_env = curr_jvm_interp_env->prev_env;
+	if (curr_jvm_interp_env->prev_env) {
+		JVM_INTERP_ENV *tmp_env;
+
+		tmp_env = curr_jvm_interp_env->prev_env;
+		memcpy(curr_jvm_interp_env, tmp_env, sizeof(JVM_INTERP_ENV));
+		free(tmp_env);
 
 	jvm_stack_depth--;
 	if (jvm_stack_depth == 0) {
@@ -1574,7 +1584,7 @@ int jvm_interp_putstatic(u2 len, char *symbol, void *base)
 		return 0;
 	}
 
-	debug_vm_interp("%s #%d\n", symbol, value);
+	debug_vm_interp("%s #%d\n", symbol, index);
         class_index = ((struct CONSTANT_Fieldref_info *)
                         curr_jvm_interp_env->constant_info[index].base)->class_index;
         class_index = ((struct CONSTANT_Class_info *)
@@ -1847,7 +1857,7 @@ CLASS_METHOD *handle_interp_invoke(u2 index)
                 }
         }
         debug_vm_interp("#found method: %s\n", curr_jvm_interp_env->constant_info[name_index].base);
-        debug_vm_interp("print method code:\n");
+        debug_vm_interp("#print method code:\n");
         debug_vm_interp("#");
         for (idx = 0; idx < method->code_attr->code_length; idx++)
                 debug_vm_interp("0x%x ", *(u1 *)(method->code_attr->op_code + idx));
@@ -1870,13 +1880,14 @@ JVM_STACK_FRAME *handle_interp_stack(CLASS_METHOD *method, u2 len)
         curr_jvm_stack = &method->code_attr->stack_frame;
         curr_jvm_stack->prev_stack = prev_stack_frame;
         curr_jvm_stack->return_addr = jvm_pc.pc + len;
-        debug_vm_interp("retrun addr: 0x%x\n", curr_jvm_stack->return_addr);
+        debug_vm_interp("#retrun addr: 0x%x\n", curr_jvm_stack->return_addr);
 
+	debug_vm_interp("#prev: %d\t%d\n", prev_stack_frame->max_locals, 
+			prev_stack_frame->max_stack);
         print_local(prev_stack_frame);
+        debug_vm_interp("#curr: %d\t%d\n", curr_jvm_stack->max_locals, 
+			curr_jvm_stack->max_stack);
         print_local(curr_jvm_stack);
-        debug_vm_interp("#prev: %d %d\tcurr: %d %d\n",
-                prev_stack_frame->max_locals, prev_stack_frame->max_stack,
-                curr_jvm_stack->max_locals, curr_jvm_stack->max_stack);
 
 	return prev_stack_frame;
 }
@@ -2205,22 +2216,6 @@ int jvm_interp_goto_w(u2 len, char *symbol, void *base)
 }
 
 int jvm_interp_jsr_w(u2 len, char *symbol, void *base)
-{
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-}
-
-int jvm_interp_getfield(u2 len, char *symbol, void *base)
-{
-	if (jvm_arg->disass_class) {
-        	printf("%s\n", symbol);
-		return 0;
-	}
-}
-
-int jvm_interp_putfield(u2 len, char *symbol, void *base)
 {
 	if (jvm_arg->disass_class) {
         	printf("%s\n", symbol);

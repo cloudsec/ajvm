@@ -596,7 +596,7 @@ int parse_constant_value(CLASS_FILED *new_filed)
 	return 0;
 }
 
-int __parse_class_filed(CLASS *jvm_class, CLASS_FILED *new_filed)
+int parse_class_filed_attribute(CLASS *jvm_class, CLASS_FILED *new_filed)
 {
 	u2 name_index, count;
 	u1 *attr_name;
@@ -636,8 +636,45 @@ int __parse_class_filed(CLASS *jvm_class, CLASS_FILED *new_filed)
 	return 0;
 }
 
+CLASS_FILED *__parse_class_filed(CLASS *jvm_class)
+{
+	CLASS_FILED *new_filed;
+
+	new_filed = (CLASS_FILED *)malloc(sizeof(CLASS_FILED));
+	if (!new_filed) {
+		jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
+		return NULL;
+	}
+
+       	CLASS_READ_U2(new_filed->access_flag, p_mem)
+       	show_class_info("\naccess_flag: 0x%x\n", new_filed->access_flag);
+
+       	CLASS_READ_U2(new_filed->name_index, p_mem)
+       	show_class_info("name_index: 0x%x\n", new_filed->name_index);
+
+       	CLASS_READ_U2(new_filed->descriptor_index, p_mem)
+       	show_class_info("descriptor_index: 0x%x\n", new_filed->descriptor_index);
+
+       	CLASS_READ_U2(new_filed->attributes_count, p_mem)
+       	show_class_info("attributes_count: 0x%x\n", new_filed->attributes_count);
+
+	if (parse_class_filed_attribute(jvm_class, new_filed) == -1) {
+		free(new_filed);
+		return NULL;
+	}
+	
+	new_filed->name_base = jvm_class->constant_info[new_filed->name_index].base;
+	new_filed->desc_base = jvm_class->constant_info[new_filed->descriptor_index].base;
+	new_filed->class = jvm_class;
+	show_class_info("#%s\t%s\n", new_filed->name_base, new_filed->desc_base);
+	list_add_tail(&(new_filed->list), &(jvm_class->filed_list_head));
+
+        return new_filed;
+}
+
 int parse_class_filed(CLASS *jvm_class)
 {
+	CLASS_FILED *new_filed;
         u2 idx;
 
 	INIT_LIST_HEAD(&(jvm_class->filed_list_head));
@@ -647,34 +684,12 @@ int parse_class_filed(CLASS *jvm_class)
         show_class_info("filed_count: %d\n", jvm_class->fileds_count);
 
 	for (idx = 0; idx < jvm_class->fileds_count; idx++) {
-		CLASS_FILED *new_filed;
-
-		new_filed = (CLASS_FILED *)malloc(sizeof(CLASS_FILED));
+		show_class_info("\n--------%d-----------", idx);
+		new_filed = __parse_class_filed(jvm_class);
 		if (!new_filed) {
-			jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
+			jvm_error(VM_ERROR_CLASS_FILE, "JVM parse filed error.");
 			return -1;
 		}
-
-        	CLASS_READ_U2(new_filed->access_flag, p_mem)
-        	show_class_info("\naccess_flag: 0x%x\n", new_filed->access_flag);
-
-        	CLASS_READ_U2(new_filed->name_index, p_mem)
-        	show_class_info("name_index: 0x%x\n", new_filed->name_index);
-
-        	CLASS_READ_U2(new_filed->descriptor_index, p_mem)
-        	show_class_info("descriptor_index: 0x%x\n", new_filed->descriptor_index);
-
-        	CLASS_READ_U2(new_filed->attributes_count, p_mem)
-        	show_class_info("attributes_count: 0x%x\n", new_filed->attributes_count);
-
-		if (__parse_class_filed(jvm_class, new_filed) == -1)
-			return -1;
-	
-		new_filed->name_base = jvm_class->constant_info[new_filed->name_index].base;
-		new_filed->desc_base = jvm_class->constant_info[new_filed->descriptor_index].base;
-		new_filed->class = jvm_class;
-		show_class_info("#%s\t%s\n", new_filed->name_base, new_filed->desc_base);
-		list_add_tail(&(new_filed->list), &(jvm_class->filed_list_head));
 	}
 
         return 0;
@@ -1181,7 +1196,7 @@ int parse_deprecated_attribute(CLASS_METHOD *method, u2 index)
         return 0;
 }
 
-int __parse_class_method(CLASS *jvm_class, CLASS_METHOD *new_method)
+int parse_class_method_attribute(CLASS *jvm_class, CLASS_METHOD *new_method)
 {
 	u2 name_index, count;
 	u1 *attr_name;
@@ -1251,6 +1266,42 @@ int do_clinit_method(CLASS_METHOD *method)
 	return 0;
 }	
 
+CLASS_METHOD *__parse_class_method(CLASS *jvm_class)
+{
+	CLASS_METHOD *new_method;
+
+        new_method = (CLASS_METHOD *)malloc(sizeof(CLASS_METHOD));
+        if (!new_method) {
+	        jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
+                return NULL;
+        }
+
+        CLASS_READ_U2(new_method->access_flag, p_mem)
+        show_class_info("access_flags: 0x%x\n", new_method->access_flag);
+
+        CLASS_READ_U2(new_method->name_index, p_mem)
+        show_class_info("name_index: %d\n", new_method->name_index);
+
+        CLASS_READ_U2(new_method->descriptor_index, p_mem)
+        show_class_info("descriptor_index: %d\n", new_method->descriptor_index);
+
+        CLASS_READ_U2(new_method->attributes_count, p_mem)
+        show_class_info("attributes_count: %d\n\n", new_method->attributes_count);
+
+        if (parse_class_method_attribute(jvm_class, new_method) == -1) {
+		free(new_method);
+                return NULL;
+	}
+
+        new_method->name_base = jvm_class->constant_info[new_method->name_index].base;
+        new_method->desc_base = jvm_class->constant_info[new_method->descriptor_index].base;
+        show_class_info("#%s\t%s\n", new_method->name_base, new_method->desc_base);
+        new_method->class = jvm_class;
+        list_add_tail(&(new_method->list), &(jvm_class->method_list_head));
+
+	return new_method;
+}
+
 int parse_class_method(CLASS *jvm_class)
 {
 	CLASS_METHOD *new_method;
@@ -1263,34 +1314,12 @@ int parse_class_method(CLASS *jvm_class)
         show_class_info("method_count: %d\n", jvm_class->method_count);
 
         for (idx = 0; idx < jvm_class->method_count; idx++ ) {
-		show_class_info("\n--------%d-----------\n", idx);
-		new_method = (CLASS_METHOD *)malloc(sizeof(CLASS_METHOD));
+        	show_class_info("\n--------%d-----------\n", idx);
+		new_method = __parse_class_method(jvm_class);
 		if (!new_method) {
-			jvm_error(VM_ERROR_MEMORY, "Malloc failed.");
+			jvm_error(VM_ERROR_CLASS_FILE, "JVM parse class method error.");
 			return -1;
 		}
-
-                CLASS_READ_U2(new_method->access_flag, p_mem)
-                show_class_info("access_flags: 0x%x\n", new_method->access_flag);
-
-                CLASS_READ_U2(new_method->name_index, p_mem)
-                show_class_info("name_index: %d\n", new_method->name_index);
-
-                CLASS_READ_U2(new_method->descriptor_index, p_mem)
-                show_class_info("descriptor_index: %d\n", new_method->descriptor_index);
-
-                CLASS_READ_U2(new_method->attributes_count, p_mem)
-                show_class_info("attributes_count: %d\n\n", new_method->attributes_count);
-
-		if (__parse_class_method(jvm_class, new_method) == -1)
-			return -1;
-
-                new_method->name_base = jvm_class->constant_info[new_method->name_index].base;
-                new_method->desc_base = jvm_class->constant_info[new_method->descriptor_index].base;
-                show_class_info("#%s\t%s\n", new_method->name_base, new_method->desc_base);
-		new_method->class = jvm_class;
-                list_add_tail(&(new_method->list), &(jvm_class->method_list_head));
-
 		if (!strcmp(new_method->name_base, "<clinit>")) {
 			if (do_clinit_method(new_method) == -1)
 				return -1;
