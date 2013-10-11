@@ -60,6 +60,11 @@ int jvm_arg_init(void)
 	return 0;
 }
 
+void jvm_arg_exit(void)
+{
+	free(jvm_arg);
+}
+
 void print_jvm_arg(void)
 {
 	printf("class path: %s\n", jvm_arg->class_path);
@@ -67,17 +72,10 @@ void print_jvm_arg(void)
 
 int show_jvm_class(JVM_ARG *arg)
 {
-        if (log_init() == -1)
-                return -1;
-
-        if (calltrace_init() == -1)
-                return -1;
-
         INIT_LIST_HEAD(&jvm_class_list_head);
         init_class_parse();
 
         if (!jvm_parse_class_file(arg->class_path, arg->class_path)) {
-		calltrace_exit();
                 return -1;
 	}
 
@@ -164,9 +162,25 @@ int main(int argc, char **argv)
                 jvm_usage(argv[0]);
                 return 0;
         }
+	
+	GET_TOP_RBP(top_rbp)
 
-	if (jvm_arg_init() == -1)
+	if (debug_init() == -1) {
+		fprintf(stderr, "debug init failed.\n");
 		return -1;
+	}
+
+	if (calltrace_init() == -1) {
+		fprintf(stderr, "calltrace init failed.\n");
+		debug_exit();
+		return -1;
+	}
+
+	if (jvm_arg_init() == -1) {
+		debug_exit();
+		calltrace_exit();
+		return -1;
+	}
 
 	while ((c = getopt(argc, argv, "c:s:d:v")) != -1) {
 		switch (c) {
@@ -196,22 +210,38 @@ int main(int argc, char **argv)
 
 	if (jvm_arg->print_class) {
 		show_jvm_class(jvm_arg);
+		jvm_arg_exit();
+		debug_exit();
+		calltrace_exit();
 		return 0;
 	}
 	
 	if (jvm_arg->disass_class) {
 		disass_jvm_class(jvm_arg);
+		jvm_arg_exit();
+		debug_exit();
+		calltrace_exit();
 		return 0;
 	}
 
-	GET_BP(top_rbp);
-	if (jvm_init(jvm_arg, argv[argc - 1]) == -1)
+	if (jvm_init(jvm_arg, argv[argc - 1]) == -1) {
+		jvm_arg_exit();
+		debug_exit();
+		calltrace_exit();
 		return 0;
+	}
 
-	if (jvm_run(argv[argc - 1]) == -1)
+	if (jvm_run(argv[argc - 1]) == -1) {
+		jvm_arg_exit();
+		debug_exit();
+		calltrace_exit();
 		return -1;
+	}
 
 	jvm_exit();
+	jvm_arg_exit();
+	debug_exit();
+	calltrace_exit();
 
         return 0;
 }

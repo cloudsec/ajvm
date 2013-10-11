@@ -1,4 +1,16 @@
-ajvm:
-	gcc -o ajvm jvm.c classloader.c interp_engine.c vm_error.c trace.c log.c -lpthread -g
+all: wvm
+
+CC      = gcc
+CFLAGS  = -fno-stack-protector -g
+
+.c.o:   $(CC) $(CFLAGS) \
+        -c -o $*.o $<
+
+OBJS =  jvm.o classloader.o interp_engine.o vm_error.o trace.o libelf.o log.o
+
+wvm: $(OBJS)
+	$(CC) -o wvm $(OBJS) -lpthread
+
 clean:
-	rm -f ajvm *.o
+	rm -f wvm *.o
+

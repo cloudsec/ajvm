@@ -21,11 +21,6 @@ typedef enum {
         LOG_NOLEVEL
 }LOG_LEVEL;
 
-enum {
-        LOG_STDOUT,
-        LOG_FILE
-};
-
 typedef struct log_arg {
         int log_level;
         int log_file_num;
@@ -38,54 +33,56 @@ typedef struct log_arg {
 }LOG_ARG;
 
 int log_init(void);
+int debug_init(void);
+void debug_exit(void);
 void log_lock(void);
 void log_unlock(void);
 
-#define debug(fmt, ...)         do_log(LOG_DEBUG, LOG_FILE, __FILE__,           \
+#define debug(fmt, ...)         do_log(LOG_DEBUG, __FILE__,           		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug(fmt, ...)       do_log(LOG_DEBUG, LOG_STDOUT, __FILE__,         \
+#define __debug(fmt, ...)       do_debug(LOG_DEBUG, __FILE__,         		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define debug1(fmt, ...)        do_log(LOG_DEBUG1, LOG_FILE, __FILE__,          \
+#define debug1(fmt, ...)        do_log(LOG_DEBUG1, __FILE__,          		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug1(fmt, ...)      do_log(LOG_DEBUG1, LOG_STDOUT, __FILE__,        \
+#define __debug1(fmt, ...)      do_debug(LOG_DEBUG1, __FILE__,        		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define debug2(fmt, ...)        do_log(LOG_DEBUG2, LOG_FILE, __FILE__,          \
+#define debug2(fmt, ...)        do_log(LOG_DEBUG2, __FILE__,          		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug2(fmt, ...)      do_log(LOG_DEBUG2, LOG_STDOUT, __FILE__,        \
+#define __debug2(fmt, ...)      do_debug(LOG_DEBUG2, __FILE__,        		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define fatal(fmt, ...)         do_log(LOG_FATAL, LOG_FILE, __FILE__,           \
+#define fatal(fmt, ...)         do_log(LOG_FATAL, __FILE__,           		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __fatal(fmt, ...)       do_log(LOG_FATAL, LOG_STDOUT, __FILE__,         \
+#define __fatal(fmt, ...)       do_debug(LOG_FATAL, __FILE__,         		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define error(fmt, ...)         do_log(LOG_ERROR, LOG_FILE, __FILE__,           \
+#define error(fmt, ...)         do_log(LOG_ERROR, __FILE__,           		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __error(fmt, ...)       do_log(LOG_ERROR, LOG_STDOUT, __FILE__,         \
+#define __error(fmt, ...)       do_debug(LOG_ERROR, __FILE__,         		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define info(fmt, ...)          do_log(LOG_INFO, LOG_FILE, __FILE__,            \
+#define info(fmt, ...)          do_log(LOG_INFO, __FILE__,            		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __info(fmt, ...)        do_log(LOG_INFO, LOG_STDOUT, __FILE__,          \
+#define __info(fmt, ...)        do_debug(LOG_INFO, __FILE__,          		\
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 

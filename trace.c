@@ -76,88 +76,211 @@
 #include <elf.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <execinfo.h>
+
+#define __USE_GNU
+#include <ucontext.h>
 
 #include "trace.h"
 #include "log.h"
 
-#define X86_64
+#if __WORDSIZE == 64
+void show_stack(ucontext_t *uc)
+{
+        int i;
+        uint64_t rsp, rbp;
 
-#ifdef X86_32
-static Elf32_Ehdr *elf_ehdr;
-static Elf32_Phdr *elf_phdr;
-static Elf32_Shdr *elf_shdr;
-static Elf32_Shdr *shstrtab;
-static Elf32_Sym *symtab_ptr;
+	rsp = uc->uc_mcontext.gregs[REG_RSP];
+	rbp = uc->uc_mcontext.gregs[REG_RBP];
+
+        printf("Stack:\t\t\nrsp: 0x%016x\t\trbp: 0x%016x\n", rsp, rbp);
+        for (i = 0; i < 16; i++) {
+                printf("0x%02x ", *((unsigned char *)rsp + i));
+        }
+        printf("\n\n");
+}
+
+void show_registers(ucontext_t *uc)
+{
+        uint64_t rax, rbx, rcx, rdx, rsi, rdi;
+        uint64_t r9, r10, r11, r12, r13, r14, r15;
+	uint64_t rip, cr2;
+
+	rax = uc->uc_mcontext.gregs[REG_RAX];
+	rbx = uc->uc_mcontext.gregs[REG_RBX];
+	rcx = uc->uc_mcontext.gregs[REG_RCX];
+	rdx = uc->uc_mcontext.gregs[REG_RDX];
+	rsi = uc->uc_mcontext.gregs[REG_RSI];
+	rdi = uc->uc_mcontext.gregs[REG_RDI];
+	r9 = uc->uc_mcontext.gregs[REG_R9];
+	r10 = uc->uc_mcontext.gregs[REG_R10];
+	r11 = uc->uc_mcontext.gregs[REG_R11];
+	r12 = uc->uc_mcontext.gregs[REG_R12];
+	r13 = uc->uc_mcontext.gregs[REG_R13];
+	r14 = uc->uc_mcontext.gregs[REG_R14];
+	r15 = uc->uc_mcontext.gregs[REG_R15];
+	rip = uc->uc_mcontext.gregs[REG_RIP];
+	cr2 = uc->uc_mcontext.gregs[REG_CR2];
+
+        printf("Registers:\n");
+	printf("RIP: 0x%016x\t\tCR2: 0x%016x\n\n", rip, cr2);
+        printf("rax = 0x%016x, rbx = 0x%016x, rcx = 0x%016x, rdx = 0x%016x\n"
+                "rsi = 0x%016x, rdi = 0x%016x, r8 = 0x%016x, r9 = 0x%016x\n"
+                "r10 = 0x%016x, r11 = 0x%016x, r12 = 0x%016x, r13 = 0x%016x\n"
+                "r14 = 0x%016x, r15 = 0x%016x\n\n",
+                rax, rbx, rcx, rdx, rsi, rdi,
+                r9, r10, r11, r12, r13, r14, r15);
+}
 #else
-static Elf64_Ehdr *elf_ehdr;
-static Elf64_Phdr *elf_phdr;
-static Elf64_Shdr *elf_shdr;
-static Elf64_Shdr *shstrtab;
-static Elf64_Sym *symtab_ptr;
+void show_stack(ucontext_t *uc)
+{
+        int i;
+        uint32_t esp, ebp;
+
+	esp = uc->uc_mcontext.gregs[REG_UESP];
+	ebp = uc->uc_mcontext.gregs[REG_EBP];
+
+        printf("Stack:\t\t\nesp: 0x%08x\t\tebp: 0x%08x\n", esp, ebp);
+        for (i = 0; i < 16; i++) {
+                printf("0x%02x ", *((unsigned char *)esp + i));
+        }
+        printf("\n\n");
+}
+
+void show_registers(ucontext_t *uc)
+{
+        uint32_t rax, rbx, rcx, rdx, rsi, rdi;
+	uint32_t rip;
+
+	eax = uc->uc_mcontext.gregs[REG_EAX];
+	ebx = uc->uc_mcontext.gregs[REG_EBX];
+	ecx = uc->uc_mcontext.gregs[REG_ECX];
+	edx = uc->uc_mcontext.gregs[REG_EDX];
+	esi = uc->uc_mcontext.gregs[REG_ESI];
+	edi = uc->uc_mcontext.gregs[REG_EDI];
+	eip = uc->uc_mcontext.gregs[REG_EIP];
+
+        printf("Registers:\n");
+	printf("EIP: 0x%08x\n\n", eip);
+        printf("eax = 0x%08x, ebx = 0x%08x, ecx = 0x%08x, edx = 0x%08x\n"
+                "esi = 0x%08x, edi = 0x%08x\n"
+                rax, rbx, rcx, rdx, rsi, rdi);
+}
 #endif
 
-static char *real_strtab;
-static char *strtab_ptr;
-static int elf_fd;
-static struct stat elf_stat;
-static char *strtab_buffer;
-static int symtab_num;
-
-uint64_t compute_real_func_addr(uint64_t rip)
+unsigned long compute_real_func_addr(unsigned long rip)
 {
-	uint64_t func_addr = 0;
-	uint64_t offset = 0;
+	unsigned long func_addr = 0;
+	unsigned long offset = 0;
 
-	offset = *(uint64_t *)(rip - 4);
+	offset = *(unsigned long *)(rip - 4);
 	func_addr = offset + rip;
 
 	return func_addr;
 }
 
-void signal_handler(int sig_num, siginfo_t *sig_info, void *ptr)
+void segfault_handler(int sig_num, siginfo_t *sig_info, void *ptr)
 {
         CALL_TRACE trace, prev_trace;
-        uint64_t *rbp, rip, real_rip;
+	ucontext_t *uc = (ucontext_t *)ptr;
+        unsigned long *rbp, rip, real_rip;
         int flag = 0, first_bp = 0;
 
-	assert(sig_info != NULL);
-        printf("\n\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n", 
-		getpid(), sig_info->si_addr, 
-		sig_info->si_signo, sig_info->si_errno);
+        assert(sig_info != NULL);
+        printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
+                getpid(), sig_info->si_addr,
+                sig_info->si_signo, sig_info->si_errno);
 
-	show_stack();
-	show_registers();
+        show_registers(uc);
+        show_stack(uc);
 
         printf("Call trace:\n\n");
+
+#ifdef GCC_BUILTIN_ADDRESS
+        rbp = (unsigned long *)__builtin_frame_address(1);
+#else
         GET_BP(rbp)
+#endif
         while (rbp != top_rbp) {
-                rip = *(uint64_t *)(rbp + 1);
-                rbp = (uint64_t *)*rbp;
+                rip = *(unsigned long *)(rbp + 1);
+                rbp = (unsigned long *)*rbp;
                 real_rip = compute_real_func_addr(rip);
 
                 if (flag == 1) {
                         if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
-                                __error("calltrace: search symbol failed.");
-                                exit(-1);
+                                __debug2("calltrace: search symbol failed.");
+				continue;
                         }
 
                         prev_trace.rip = rip - 5;
-			if (first_bp == 0) {
-				first_bp = 1;
-				prev_trace.offset = 0;
-			}
-			else {
-                        	prev_trace.offset = trace.rip - prev_trace.symbol_addr;
-			}
+                        if (first_bp == 0) {
+                                first_bp = 1;
+                                prev_trace.offset = 0;
+                        }
+                        else {
+                                prev_trace.offset = trace.rip - prev_trace.symbol_addr;
+                        }
                         show_calltrace(&prev_trace);
 
                         trace = prev_trace;
                 }
                 else {
-			/* it's in a single handler function, the last call frame is unkown,
-			 * we can't locate the rip addr. */
+                        /* it's in a single handler function, the last call frame is unkown,
+                         * we can't locate the rip addr. */
                         search_symbol_by_addr(real_rip, &trace);
                         trace.rip = rip - 5;
+                        flag = 1;
+                }
+        }
+        printf("\n");
+
+        exit(0);
+}
+
+void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
+{
+        CALL_TRACE trace, prev_trace;
+        ucontext_t *uc = (ucontext_t *)ptr;
+        void *addr[32];
+        unsigned long real_rip;
+        int i, num;
+        int flag = 0, first_bp = 0;
+
+        assert(sig_info != NULL);
+        printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
+                getpid(), sig_info->si_addr,
+                sig_info->si_signo, sig_info->si_errno);
+
+        show_registers(uc);
+        show_stack(uc);
+
+        printf("Call trace:\n\n");
+        num = backtrace(addr, 32);
+	addr[1] = (unsigned long *)uc->uc_mcontext.gregs[REG_RIP];
+
+        for (i = 1; i < num; i++) {
+                //printf("0x%016x\n", addr[i]);
+                real_rip = compute_real_func_addr((unsigned long)addr[i]);
+
+                if (flag == 1) {
+                        if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
+                                __debug2("search symbol failed: 0x%x", real_rip);
+                                continue;
+                        }
+
+                        prev_trace.rip = (unsigned long)addr[i] - 5;
+                        prev_trace.offset = trace.rip - prev_trace.symbol_addr;
+                        show_calltrace(&prev_trace);
+
+                        trace = prev_trace;
+                }
+                else {
+                        if (search_symbol_by_addr(real_rip, &trace) == -1) {
+                                __debug2("search symbol failed: 0x%x", real_rip);
+                                //continue;
+                        }
+                        /* the rip generate segfault. */
+                        trace.rip = (unsigned long)addr[i] - 5;
                         flag = 1;
                 }
         }
@@ -169,19 +292,26 @@ void signal_handler(int sig_num, siginfo_t *sig_info, void *ptr)
 void calltrace(void)
 {
 	CALL_TRACE trace, prev_trace;
-	uint64_t *rbp, rip, real_rip;
-	int flag = 0, first_bp = 0;
+	unsigned long *rbp, rip, real_rip;
+	int flag = 0;
 
 	printf("Call trace:\n\n");
+
+#ifdef GCC_BUILTIN_ADDRESS
+	rbp = (unsigned long *)__builtin_frame_address(0);
+#else
 	GET_BP(rbp)
+#endif
+
 	while (rbp != top_rbp) {
-		rip = *(uint64_t *)(rbp + 1);
-		rbp = (uint64_t *)*rbp;
+		rip = *(unsigned long *)(rbp + 1);
+		rbp = (unsigned long *)*rbp;
 		real_rip = compute_real_func_addr(rip);
 
+		__debug2("0x%lx\t0x%x\t0x%x\n", rbp, rip, real_rip);
 		if (flag == 1) {
 			if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
-				__error("calltrace: search symbol failed.");
+				__error("search symbol failed: 0x%x", real_rip);
 				continue;
 			}
 
@@ -193,9 +323,10 @@ void calltrace(void)
 		}
 		else {
 			if (search_symbol_by_addr(real_rip, &trace) == -1) {
-				__error("calltrace: search symbol failed.");
-				continue;
+				__error("search symbol failed: 0x%x", real_rip);
+				//continue;
 			}
+			/* the rip generate segfault. */
 			trace.rip = rip - 5;
 			flag = 1;
 		}
@@ -203,57 +334,44 @@ void calltrace(void)
 	printf("\n");
 }
 
-int check_elf_header(Elf64_Ehdr *ehdr)
+void calltrace_gnu(void)
 {
-	if (ehdr->e_ident[EI_MAG0] != 0x7f
-		|| ehdr->e_ident[EI_MAG1] != 'E'
-		|| ehdr->e_ident[EI_MAG1] != 'L'
-		|| ehdr->e_ident[EI_MAG1] != 'F') {
-		return -1;
-	}
+	CALL_TRACE trace, prev_trace;
+	void *addr[32];
+	unsigned long real_rip;
+	int i, num;
+	int flag = 0;
 
-	return 0;
-}
+	printf("Call trace:\n\n");
 
-void show_stack(void)
-{
-	int i;
-	uint64_t *rsp, *rbp;
+	num = backtrace(addr, 32);
+	for (i = 0; i < num; i++) {
+		real_rip = compute_real_func_addr((unsigned long)addr[i]);
+		__debug2("0x%016x\t0x%016x\n", addr[i], real_rip);
 
-	GET_SP(rsp);
-	GET_BP(rbp);
-	printf("Stack:\t\t\nrsp: 0x%016x\t\trbp: 0x%016x\n", rsp, rbp);
-	for (i = 0; i < 16; i++) {
-		printf("0x%02x ", *((unsigned char *)rsp + i));
-	}
-	printf("\n\n");
-}
+		if (flag == 1) {
+			if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
+				__debug2("search symbol failed: 0x%016x", real_rip);
+				continue;
+			}
 
-void show_registers(void)
-{
-	uint64_t rax, rbx, rcx, rdx, rsi, rdi;
-	uint64_t r9, r10, r11, r12, r13, r14, r15;
+			prev_trace.rip = (unsigned long)addr[i] - 5;
+			prev_trace.offset = trace.rip - prev_trace.symbol_addr;
+			show_calltrace(&prev_trace);
 
-	GET_AX(rax)
-	GET_BX(rbx)
-	GET_CX(rcx)
-	GET_DX(rdx)
-	GET_SI(rsi)
-	GET_DI(rdi)
-	GET_R9(r9)
-	GET_R10(r10)
-	GET_R11(r11)
-	GET_R12(r12)
-	GET_R13(r13)
-	GET_R14(r14)
-	GET_R15(r15)
-	printf("Registers:\n");
-	printf("rax = 0x%016x, rbx = 0x%016x, rcx = 0x%016x, rdx = 0x%016x\n"
-		"rsi = 0x%016x, rdi = 0x%016x, r8 = 0x%016x, r9 = 0x%016x\n"
-		"r10 = 0x%016x, r11 = 0x%016x, r12 = 0x%016x, r13 = 0x%016x\n"
-		"r14 = 0x%016x, r15 = 0x%016x\n\n", 
-		rax, rbx, rcx, rdx, rsi, rdi,
-		r9, r10, r11, r12, r13, r14, r15);
+			trace = prev_trace;
+		}
+		else {
+			if (search_symbol_by_addr(real_rip, &trace) == -1) {
+				__debug2("search symbol failed: 0x%016x", real_rip);
+				/* skip the first trace? */
+				//continue;
+			}
+			trace.rip = (unsigned long)addr[i] - 5;
+			flag = 1;
+		}
+	}  
+	printf("\n");
 }
 
 void show_calltrace(CALL_TRACE *trace)
@@ -263,137 +381,6 @@ void show_calltrace(CALL_TRACE *trace)
 	snprintf(buff, sizeof(buff), "[<0x%x>] %s + 0x%x/0x%x\n", 
 			trace->rip, trace->symbol_name, trace->offset, trace->size);
 	printf("%s", buff);
-}
-
-int search_symbol_by_addr(uint64_t rip, CALL_TRACE *trace)
-{
-	int i;
-
-	for (i = 0; i < symtab_num; i++) {
-		if (symtab_ptr[i].st_value == (unsigned int)rip) {
-			trace->symbol_name = strtab_buffer + symtab_ptr[i].st_name;
-			trace->symbol_addr = rip;
-			trace->size = symtab_ptr[i].st_size;
-			return 0;
-		}
-	}
-
-	return -1;
-}
-
-void print_symtab(void)
-{
-	int i;
-
-        for (i = 0; i < symtab_num; i++) {
-                fprintf(stdout,"%4d     %25s    0x%08x  x%08x   0x%02x  %4d\n", i,
-                        strtab_buffer + symtab_ptr[i].st_name,
-                        symtab_ptr[i].st_value,
-                        symtab_ptr[i].st_size,
-                        symtab_ptr[i].st_info,
-                        symtab_ptr[i].st_shndx);
-        }
-}
-
-int load_elf_symbols(char *elf_file)
-{
-	unsigned int strtab_off, strtab_size;
-	int phdr_len, shdr_len;
-	int shstrtab_off, shstrtab_len;
-	int symtab_off, symtab_size, i;
-	char *buffer;
-
-	assert(elf_file != NULL);
-	elf_fd = open(elf_file, O_RDONLY);
-	if (elf_fd == -1) {
-		perror("open");
-		goto out;
-	}
-
-	if (fstat(elf_fd, &elf_stat) == -1) {
-		perror("fstat");
-		goto out;
-	}
-
-	elf_ehdr = mmap(0, elf_stat.st_size, PROT_READ, MAP_SHARED, elf_fd, 0);
-	if (elf_ehdr == MAP_FAILED) {
-		perror("mmap");
-		goto out;
-	}
-
-/*
-	if (check_elf_header(elf_ehdr) == -1) {
-		printf("check elf failed.\n");
-		goto out_mmap;
-	}
-*/
-
-#ifdef X86_32
-	elf_phdr = (Elf32_Phdr *)((uint64_t)elf_ehdr + elf_ehdr->e_phoff);
-	elf_shdr = (Elf32_Shdr *)((uint64_t)elf_ehdr + elf_ehdr->e_shoff);
-#else
-	elf_phdr = (Elf64_Phdr *)((uint64_t)elf_ehdr + elf_ehdr->e_phoff);
-	elf_shdr = (Elf64_Shdr *)((uint64_t)elf_ehdr + elf_ehdr->e_shoff);
-#endif
-
-	shstrtab = &elf_shdr[elf_ehdr->e_shstrndx];
-	shstrtab_off = (unsigned int)shstrtab->sh_offset;
-	shstrtab_len = shstrtab->sh_size;
-	real_strtab = (char *)((uint64_t)elf_ehdr + shstrtab_off);
-
-	buffer = malloc(shstrtab_len + 1);
-	if (!buffer) {
-		printf("Malloc faled.\n");
-		goto out;
-	}
-
-	memcpy(buffer, real_strtab, shstrtab_len + 1);
-	shdr_len = elf_ehdr->e_shoff;
-
-	for (i = 0 ; i < (int)elf_ehdr->e_shnum ; i++){
-		if (!strcmp(buffer + elf_shdr[i].sh_name,".symtab")) {
-			symtab_off = (unsigned int)elf_shdr[i].sh_offset;
-			symtab_size = (unsigned int)elf_shdr[i].sh_size;
-			symtab_num = (int )(elf_shdr[i].sh_size / elf_shdr[i].sh_entsize);
-                }
-
-                if (!strcmp(buffer + elf_shdr[i].sh_name,".strtab")) {
-			strtab_off = (unsigned int)elf_shdr[i].sh_offset;
-			strtab_size = (unsigned int)elf_shdr[i].sh_size;
-		}
-        }
-	free(buffer);
-
-	strtab_ptr = (char *)((uint64_t)elf_ehdr + strtab_off);
-	strtab_buffer = malloc(strtab_size + 1);
-	if (!strtab_buffer) {
-		printf("Malloc failed.\n");
-		goto out;
-	}
-
-	memcpy(strtab_buffer, strtab_ptr, strtab_size + 1);
-
-	symtab_ptr = malloc(symtab_size + 1);
-	if (!symtab_ptr) {
-		printf("Malloc failed.\n");
-		free(strtab_ptr);
-		goto out;
-	}
-	memcpy(symtab_ptr, (char *)((uint64_t)elf_ehdr + symtab_off), symtab_size + 1);
-
-	return 0;
-
-out_mmap:
-	munmap(elf_ehdr, elf_stat.st_size);
-out:
-	close(elf_fd);
-	return -1;
-}
-
-void free_elf_mmap(void)
-{
-	munmap(elf_ehdr, elf_stat.st_size);
-	close(elf_fd);
 }
 
 int get_self_path(char *proc_path, int proc_path_len)
@@ -417,7 +404,7 @@ int signal_init(void)
 	struct sigaction sa;
 
 	sa.sa_flags = SA_SIGINFO;
-	sa.sa_sigaction = signal_handler;
+	sa.sa_sigaction = segfault_handler_gnu;
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIGSEGV, &sa, NULL) == -1) {
@@ -428,6 +415,16 @@ int signal_init(void)
 	return 0;
 }
 
+void get_top_rbp(void)
+{
+#ifdef GCC_BUILTIN_ADDRESS
+        top_rbp = (unsigned long *)__builtin_frame_address(1);
+#else
+        GET_BP(top_rbp)
+#endif
+}
+
+//int __attribute__((constructor)) calltrace_init(void)
 int calltrace_init(void)
 {
 	char self_path[1024];
@@ -439,20 +436,15 @@ int calltrace_init(void)
 	if (self_path[0] == '\0')
 		return -1;
 
-	if (load_elf_symbols(self_path) == -1)
+	if (parse_elf_symbol(self_path) == -1) {
+		__error("parse elf symbol failed.");
 		return -1;
-
-	/* We just want to use the strtab_ptr & symtab_str that has allocated 
-	 * above, so we can munmap the file now.
-	 */ 
-	free_elf_mmap();
-	//print_symtab();
+	}
 
 	return 0; 
 }
 
 void calltrace_exit(void)
 {
-	free(strtab_buffer);
-	free(symtab_ptr);
+	elf_exit();
 }

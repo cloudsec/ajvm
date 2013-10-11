@@ -3,7 +3,19 @@
 
 #include <stdlib.h>
 
-#define X86_64
+//#define GCC_BUILTIN_ADDRESS
+
+#if __WORDSIZE == 64
+#ifdef GCC_BUILTIN_ADDRESS					
+#define GET_TOP_RBP(rbp) do {							  \
+				rbp = (unsigned long *)__builtin_frame_address(0);\
+			} while(0);						
+#else								
+#define GET_TOP_RBP(rbp) do {							\
+				asm("movq %%rbp, %0":"=r"(rbp));		\			
+			} while (0);					
+#endif								
+
 
 #define GET_BP(x)      		asm("movq %%rbp, %0":"=r"(x));
 #define GET_SP(x)      		asm("movq %%rsp, %0":"=r"(x));
@@ -22,6 +34,28 @@
 #define GET_R14(x)     		asm("movq %%r14, %0":"=r"(x));
 #define GET_R15(x)     		asm("movq %%r15, %0":"=r"(x));
 
+#else
+#ifdef GCC_BUILTIN_ADDRESS					
+#define GET_TOP_EBP(ebp) do {							  \
+				ebp = (unsigned long *)__builtin_frame_address(0);\
+			} while(0);						
+#else								
+#define GET_TOP_EBP(rbp) do {							\
+				asm("movq %%ebp, %0":"=r"(ebp));		\			
+			} while (0);					
+#endif								
+
+#define GET_BP(x)      		asm("movl %%ebp, %0":"=r"(x));
+#define GET_SP(x)      		asm("movl %%esp, %0":"=r"(x));
+#define GET_AX(x)      		asm("movl %%eax, %0":"=r"(x));
+#define GET_BX(x)      		asm("movl %%ebx, %0":"=r"(x));
+#define GET_CX(x)      		asm("movl %%ecx, %0":"=r"(x));
+#define GET_DX(x)      		asm("movl %%edx, %0":"=r"(x));
+#define GET_SI(x)      		asm("movl %%esi, %0":"=r"(x));
+#define GET_DI(x)      		asm("movl %%edi, %0":"=r"(x));
+
+#endif
+
 typedef struct trace_st {
 	unsigned long rip;
 	char *symbol_name;
@@ -32,11 +66,11 @@ typedef struct trace_st {
 
 unsigned long *top_rbp;
 void calltrace(void);
-void show_stack(void);
-void show_registers(void);
+void calltrace_gnu(void);
 void show_calltrace(CALL_TRACE *trace);
 int search_symbol_by_addr(unsigned long addr, CALL_TRACE *trace);
 int load_elf_symbols(char *elf_file);
+void get_top_rbp(void);
 int calltrace_init(void);
 void calltrace_exit(void);
 

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2012, 2013 wzt         http://www.cloud-sec.org
  *
- * log.c
+ * log.c - logging & debugging module.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -91,13 +91,14 @@ int get_process_name(char *proc_name)
 
 int log_init(void)
 {
+        char proc_name[64] = {0};
         char buff[1024];
-        char proc_name[64];
         char pwd[1024];
 
-        memset(proc_name, '\0', 64);
-        if (get_process_name(proc_name) == -1)
+        if (get_process_name(proc_name) == -1) {
+		fprintf(stderr, "get process name failed.\n");
                 return -1;
+	}
 
         if (!getcwd(pwd, 1024))
                 return -1;
@@ -108,7 +109,6 @@ int log_init(void)
                 return -1;
         }
 
-        //log_arg->log_level = LOG_DEBUG2;
         log_arg->log_level = LOG_ERROR;
         log_arg->log_file_num = LOG_NUM;
         log_arg->curr_log_num = 0;
@@ -120,28 +120,87 @@ int log_init(void)
          * improve the performance, we just raise the log_size:::).
          */
         log_arg->log_size = LOG_SIZE;
-        snprintf(log_arg->log_path, 1024, "%s/jvm_%d_%s", "/var/log/", getpid(), proc_name);
+        snprintf(log_arg->log_path, 1024, "%s/%d_%s", "/tmp/", getpid(), proc_name);
         pthread_mutex_init(&log_arg->log_lock, NULL);
 
-        mkdir(log_arg->log_path, 700);
+        if (mkdir(log_arg->log_path, 0700) == -1) {
+		perror("mkdir");
+		goto out;
+	}
 
         snprintf(buff, sizeof(buff), "%s/log.1", log_arg->log_path);
         strcpy(log_arg->curr_log, buff);
 
         log_lock();
-        log_arg->log_fp = fopen(buff, "w+");
+        log_arg->log_fp = fopen(log_arg->curr_log, "w+");
         if (!log_arg->log_fp) {
                 perror("fopen");
-                log_unlock();
-                free(log_arg);
-                return -1;
+        	log_unlock();
+		goto out;
         }
         log_unlock();
 
         return 0;
+
+out:
+        free(log_arg);
+        return -1;
 }
 
-void do_log(LOG_LEVEL log_level, int flag, char *file_name, char *function,
+int debug_init(void)
+{
+        log_arg = (LOG_ARG *)malloc(sizeof(LOG_ARG));
+        if (!log_arg) {
+                fprintf(stderr, "Malloc failed.\n");
+                return -1;
+        }
+
+        log_arg->log_level = LOG_ERROR;
+
+	return 0;
+}
+
+void debug_exit(void)
+{
+	free(log_arg);
+}
+
+void do_log(LOG_LEVEL log_level, char *file_name, char *function,
+                int line, char *fmt, ...)
+{
+        struct tm *log_now;
+        time_t log_t;
+        va_list arg;
+        char buf1[1024], buf2[2048];
+
+        assert(log_arg->log_level != LOG_NOLEVEL);
+        if (log_level > log_arg->log_level)
+                return ;
+
+        sync();
+        va_start(arg, fmt);
+        vsnprintf(buf1, sizeof(buf1), fmt, arg);
+        va_end(arg);
+
+        log_lock();
+        time(&log_t);
+        log_now = localtime(&log_t);
+        snprintf(buf2, sizeof(buf2),
+                "%04d-%02d-%02d %02d:%02d:%02d -- %s:%s(%d): %s",
+                log_now->tm_year + 1900, log_now->tm_mon + 1,
+                log_now->tm_mday, log_now->tm_hour, log_now->tm_min,
+                log_now->tm_sec, file_name, function, line, buf1);
+
+        if (check_log_size() == -1) {
+                log_unlock();
+                return ;
+        }
+
+        fprintf(log_arg->log_fp, "%s\n", buf2);
+        log_unlock();
+}
+
+void do_debug(LOG_LEVEL log_level, char *file_name, char *function,
                 int line, char *fmt, ...)
 {
         struct tm *log_now;
@@ -153,32 +212,11 @@ void do_log(LOG_LEVEL log_level, int flag, char *file_name, char *function,
         if (log_level > log_arg->log_level)
                 return ;
 
-        sync();
-        time(&log_t);
-        log_now = localtime(&log_t);
-        snprintf(buff, sizeof(buff),
-                "%04d-%02d-%02d %02d:%02d:%02d -- %s:%s(%d): ",
-                log_now->tm_year + 1900, log_now->tm_mon + 1,
-                log_now->tm_mday, log_now->tm_hour, log_now->tm_min,
-                log_now->tm_sec, file_name, function, line);
         va_start(arg, fmt);
-        vsprintf(buff + strlen(buff), fmt, arg);
+        vsnprintf(buff, sizeof(buff), fmt, arg);
         va_end(arg);
 
-        log_lock();
-        if (flag == LOG_STDOUT) {
-                fprintf(stdout, "%s\n", buff);
-                log_unlock();
-                return ;
-        }
-
-        if (check_log_size() == -1) {
-                log_unlock();
-                return ;
-        }
-
-        fprintf(log_arg->log_fp, "%s\n", buff);
-        log_unlock();
+        fprintf(stdout, "%s(%s)[%d]:\t%s\n", file_name, function, line, buff);
 }
 
 int extract_log_num(void)
@@ -229,8 +267,10 @@ int check_log_size(void)
 {
         struct stat f_stat;
 
-        if (stat(log_arg->curr_log, &f_stat) == -1)
+        if (stat(log_arg->curr_log, &f_stat) == -1) {
+		perror("stat");
                 return -1;
+	}
 
         if (f_stat.st_size >= log_arg->log_size) {
                 if (expand_log() == -1) {

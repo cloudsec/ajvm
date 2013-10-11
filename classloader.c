@@ -391,6 +391,7 @@ int hanlde_class_string(CLASS *jvm_class, u2 constant_pool_count,
 	jvm_class->constant_info[idx].index = idx;
 	jvm_class->constant_info[idx].tag = tag;
 	jvm_class->constant_info[idx].base = (u1 *)string_info;
+
 	return 0;
 }
 
@@ -428,13 +429,9 @@ int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx
 	return 0;
 }
 
-int parse_class_constant(CLASS *jvm_class)
+int parse_constant_count(CLASS *jvm_class)
 {
-        u1 constant_tag;
-        u2 idx;
-
         show_class_info("\n-----------parse contant pool count----------------------:\n\n");
-        /* read constant_pool_count */
         CLASS_READ_U2(jvm_class->constant_pool_count, p_mem)
         show_class_info("jvm constant_pool_count: %d\n", jvm_class->constant_pool_count);
 
@@ -443,20 +440,31 @@ int parse_class_constant(CLASS *jvm_class)
 		return -1;
 	}
 
+	return 0;
+}
+
+int alloc_constant_info(CLASS *jvm_class)
+{
         jvm_class->constant_info = (struct constant_info_st *)
 			malloc(sizeof(struct constant_info_st) * jvm_class->constant_pool_count);
         if (!jvm_class->constant_info) {
-                __error("Malloc failed.\n");
+                __error("Malloc failed.");
                 return -1;
         }
 	memset(jvm_class->constant_info, '\0', sizeof(struct constant_info_st) * 
 		jvm_class->constant_pool_count);
-		
-	/* The constant_pool table is indexed from 1 to constant_pool_count-1. */
-        for (idx = 1; idx <= jvm_class->constant_pool_count - 1; idx++ ) {
-                CLASS_READ_U1(constant_tag, p_mem)
-                show_class_info("- idx: %d constant tag: %d\t", idx, (int)constant_tag);
-                switch (constant_tag) {
+
+	return 0;
+}
+
+int __parse_class_constant(CLASS *jvm_class, int idx)
+{
+        u1 constant_tag;
+
+        CLASS_READ_U1(constant_tag, p_mem)
+        show_class_info("- idx: %d constant tag: %d\t", idx, (int)constant_tag);
+
+        switch (constant_tag) {
                 case CONSTANT_Fieldref:
                 case CONSTANT_Methodref:
                 case CONSTANT_InterfaceMethodref:
@@ -514,38 +522,67 @@ int parse_class_constant(CLASS *jvm_class)
                 default:
 			jvm_error(VM_ERROR_CLASS_FILE, "constant error.");
 			return -1;
-                }
+	}
+
+	return 0;
+}
+
+int parse_class_constant(CLASS *jvm_class)
+{
+        u2 idx;
+
+	if (parse_constant_count(jvm_class) == -1)
+		return -1;
+
+	if (alloc_constant_info(jvm_class) == -1)
+		return -1;
+		
+	/* The constant_pool table is indexed from 1 to constant_pool_count-1. */
+        for (idx = 1; idx <= jvm_class->constant_pool_count - 1; idx++ ) {
+		if (__parse_class_constant(jvm_class, idx) == -1)
+			goto out;
         }
 	show_class_info("\n");
 
         return 0;
 
 out:
+	free(jvm_class->constant_info);
         mmap_exit();
         return -1;
 }
 
 int parse_class_access_flag(CLASS *jvm_class)
 {
+	u2 access_flag;
+
         /* read class access flag. */
         CLASS_READ_U2(jvm_class->access_flag, p_mem)
         show_class_info("class access_flag: 0x%x\n", jvm_class->access_flag);
-
-/*
-	if (jvm_class->access_flag != ACC_PUBLIC ||
-		jvm_class->access_flag != ACC_FINAL ||
-		jvm_class->access_flag != ACC_SUPER ||
-		jvm_class->access_flag != ACC_INTERFACE ||
-		jvm_class->access_flag != ACC_ABSTRACT ||
-		jvm_class->access_flag != ACC_SYNTHETIC ||
-		jvm_class->access_flag != ACC_ANNOTATION ||
-		jvm_class->access_flag != ACC_ENUM) {
-		jvm_error(VM_ERROR_CLASS_FILE, "JVM class wrong access_flag.");
-		return -1;
-	}
-*/
 	
-        return 0;
+	access_flag = jvm_class->access_flag;
+	if (access_flag & ACC_INTERFACE) {
+		if (!(access_flag & ACC_ABSTRACT))
+			goto out;
+	
+		if ((access_flag & ACC_FINAL) || (access_flag & ACC_SUPER) || 
+			(access_flag & ACC_ENUM)) {
+			goto out;
+		}
+	}
+
+	if (access_flag & ACC_ANNOTATION) {
+		if (!(access_flag & ACC_INTERFACE))
+			goto out;
+
+		if ((access_flag & ACC_FINAL) || (access_flag & ACC_ABSTRACT))
+			goto out;
+	}
+
+	return 0;
+out:
+	jvm_error(VM_ERROR_CLASS_FILE, "JVM access_flag error.\n");
+        return -1;
 }
 int parse_class_this_super(CLASS *jvm_class)
 {
