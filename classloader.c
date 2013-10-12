@@ -137,7 +137,7 @@ int parse_class_version(CLASS *jvm_class)
         return 0;
 }
 
-int handle_class_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
+int handle_class_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx, u1 tag)
 {
 	struct CONSTANT_Class_info *class_info;
 
@@ -149,7 +149,7 @@ int handle_class_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
         }
 
         CLASS_READ_U2(class_info->name_index, p_mem);
-        if (class_info->name_index < 0 || class_info->name_index >= constant_pool_count) {
+        if (class_info->name_index < 1 || class_info->name_index >= constant_pool_count) {
 		char err_buf[128];
 		
 		snprintf(err_buf, 128, "JVM class_info->name_index error: %d\n", 
@@ -162,12 +162,13 @@ int handle_class_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
         class_info->base = jvm_class->constant_info[class_info->name_index].base;
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].index = tag;
         jvm_class->constant_info[idx].base = (u1 *)class_info;
 
 	return 0;
 }
 
-int handle_class_InvokeDynamic(CLASS *jvm_class, u2 idx)
+int handle_class_InvokeDynamic(CLASS *jvm_class, u2 idx, u1 tag)
 {
 	struct CONSTANT_InvokeDynamic_info *invoke_dyc_info;
 
@@ -180,17 +181,33 @@ int handle_class_InvokeDynamic(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U2(invoke_dyc_info->bootstrap_method_attr_index, p_mem);
         CLASS_READ_U2(invoke_dyc_info->name_and_type_index, p_mem);
+
+	if (invoke_dyc_info->bootstrap_method_attr_index < 1 ||
+		invoke_dyc_info->bootstrap_method_attr_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM bootstrap_method_attr_index error.");
+		free(invoke_dyc_info);
+		return -1;
+	}
+
+	if (invoke_dyc_info->name_and_type_index < 1 || 
+		invoke_dyc_info->name_and_type_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM name_and_type_index error.");
+		free(invoke_dyc_info);
+		return -1;
+	}
+
         show_class_info("bootstrap_method_attr_index: %d, name_and_type_index: %d\n",
         	invoke_dyc_info->bootstrap_method_attr_index,
                 invoke_dyc_info->name_and_type_index);
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].tag = tag;
         jvm_class->constant_info[idx].base = (u1 *)invoke_dyc_info;
 
 	return 0;
 }
 
-int handle_class_utf8(CLASS *jvm_class, u2 idx)
+int handle_class_utf8(CLASS *jvm_class, u2 idx, u1 tag)
 {
 	u2 len;
         u1 *buf;
@@ -208,12 +225,13 @@ int handle_class_utf8(CLASS *jvm_class, u2 idx)
         p_mem += len;
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].tag = tag;
         jvm_class->constant_info[idx].base = buf;
 
 	return 0;
 }
 
-int handle_class_method_type(CLASS *jvm_class, u2 idx)
+int handle_class_method_type(CLASS *jvm_class, u2 idx, u1 tag)
 {
 	struct CONSTANT_MethodType_info *method_type_info;
 
@@ -225,15 +243,22 @@ int handle_class_method_type(CLASS *jvm_class, u2 idx)
 	}
         
         CLASS_READ_U2(method_type_info->descriptor_index, p_mem);
+	if (method_type_info->descriptor_index < 1 || 
+		method_type_info->descriptor_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM method descriptor_index error.");
+		free(method_type_info);
+		return -1;
+	}
         show_class_info("descriptor_index %d\n", method_type_info->descriptor_index);
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].tag = tag;
         jvm_class->constant_info[idx].base = (u1 *)method_type_info;
 
 	return 0;
 }
 
-int handle_class_method_handle(CLASS *jvm_class, u2 idx)
+int handle_class_method_handle(CLASS *jvm_class, u2 idx, u1 tag)
 {
         struct CONSTANT_MethodHandle_info *method_handle_info;
 
@@ -246,17 +271,33 @@ int handle_class_method_handle(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U1(method_handle_info->reference_kind, p_mem);
         CLASS_READ_U2(method_handle_info->reference_index, p_mem);
+
+	if (method_handle_info->reference_kind < 1 && 
+		method_handle_info->reference_kind > 9) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM method reference_kind error.");
+		free(method_handle_info);
+		return -1;
+	}
+
+	if (method_handle_info->reference_index < 1 || 
+		method_handle_info->reference_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM method reference_index error.");
+		free(method_handle_info);
+		return -1;
+	}
+
         show_class_info("reference_kind: %d, reference_index: %d\n",
         	method_handle_info->reference_kind,
                 method_handle_info->reference_index);
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].tag = tag;
         jvm_class->constant_info[idx].base = (u1 *)method_handle_info;
 
 	return 0;
 }
 
-int handle_class_name_and_type(CLASS *jvm_class, u2 idx)
+int handle_class_name_and_type(CLASS *jvm_class, u2 idx, u1 tag)
 {
         struct CONSTANT_NameAndType_info *name_type_info;
 
@@ -269,10 +310,27 @@ int handle_class_name_and_type(CLASS *jvm_class, u2 idx)
 
         CLASS_READ_U2(name_type_info->name_index, p_mem);
         CLASS_READ_U2(name_type_info->descriptor_index, p_mem);
+
+	if (name_type_info->name_index < 1 || 
+		name_type_info->name_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM class_name_and_type index error.");
+		free(name_type_info);
+		return -1;
+	}
+		
+	if (name_type_info->descriptor_index < 1 ||
+		name_type_info->descriptor_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, 
+			"JVM class_name_and_type descriptor_index error.");
+		free(name_type_info);
+		return -1;
+	}
+
         show_class_info("name_index: %d, descriptor_index: %d\n",
         	name_type_info->name_index, name_type_info->descriptor_index);
 
         jvm_class->constant_info[idx].index = idx;
+        jvm_class->constant_info[idx].tag = tag;
         jvm_class->constant_info[idx].base = (u1 *)name_type_info;
 
 	return 0;
@@ -383,6 +441,7 @@ int hanlde_class_string(CLASS *jvm_class, u2 constant_pool_count,
         if (string_info->string_index < 1 ||
                 string_info->string_index >= constant_pool_count) {
 		jvm_error(VM_ERROR_CLASS_FILE, "JVM string_index error.");
+		free(string_info);
 		return -1;
 	}
 
@@ -395,7 +454,8 @@ int hanlde_class_string(CLASS *jvm_class, u2 constant_pool_count,
 	return 0;
 }
 
-int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx)
+int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, 
+		u2 idx, u1 tag)
 {
         struct CONSTANT_Methodref_info *methodref_info;
 
@@ -410,13 +470,15 @@ int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx
         if (methodref_info->class_index < 1 || 
                  methodref_info->class_index >= constant_pool_count) {
 		jvm_error(VM_ERROR_CLASS_FILE, "JVM string_index error.");
+		free(methodref_info);
 		return -1;
 	}
 
         CLASS_READ_U2(methodref_info->name_and_type_index, p_mem);
-        if (methodref_info->class_index < 1 &&
+        if (methodref_info->class_index < 1 || 
                  methodref_info->class_index >= constant_pool_count) {
 		jvm_error(VM_ERROR_CLASS_FILE, "JVM string_index error.");
+		free(methodref_info);
 		return -1;
 	}
         show_class_info("class_index: %d, name_and_type_index: %d\n",
@@ -424,6 +486,7 @@ int handle_class_methodref_info(CLASS *jvm_class, u2 constant_pool_count, u2 idx
                  methodref_info->name_and_type_index);
 
 	jvm_class->constant_info[idx].index = idx;
+	jvm_class->constant_info[idx].tag = tag;
 	jvm_class->constant_info[idx].base = (u1 *)methodref_info;
 
 	return 0;
@@ -457,6 +520,12 @@ int alloc_constant_info(CLASS *jvm_class)
 	return 0;
 }
 
+void free_constant_info(CLASS *jvm_class)
+{
+	if (jvm_class->constant_info)
+		free(jvm_class->constant_info);
+}
+
 int __parse_class_constant(CLASS *jvm_class, int idx)
 {
         u1 constant_tag;
@@ -469,11 +538,12 @@ int __parse_class_constant(CLASS *jvm_class, int idx)
                 case CONSTANT_Methodref:
                 case CONSTANT_InterfaceMethodref:
 			if (handle_class_methodref_info(jvm_class, jvm_class->constant_pool_count, 
-				idx) == -1)
+				idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_Class:
-			if (handle_class_info(jvm_class, jvm_class->constant_pool_count, idx) == -1)
+			if (handle_class_info(jvm_class, jvm_class->constant_pool_count, 
+				idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_String:
@@ -500,23 +570,23 @@ int __parse_class_constant(CLASS *jvm_class, int idx)
 			idx++;
                         break;
                 case CONSTANT_NameAndType:
-			if (handle_class_name_and_type(jvm_class, idx) == -1)
+			if (handle_class_name_and_type(jvm_class, idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_MethodHandle:
-			if (handle_class_method_handle(jvm_class, idx) == -1)
+			if (handle_class_method_handle(jvm_class, idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_MethodType:
-			if (handle_class_method_type(jvm_class, idx) == -1)
+			if (handle_class_method_type(jvm_class, idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_InvokeDynamic:
-			if (handle_class_InvokeDynamic(jvm_class, idx) == -1)
+			if (handle_class_InvokeDynamic(jvm_class, idx, constant_tag) == -1)
 				return -1;
                         break;
                 case CONSTANT_Utf8:
-			if (handle_class_utf8(jvm_class, idx) == -1)
+			if (handle_class_utf8(jvm_class, idx, constant_tag) == -1)
 				return -1;
                         break;
                 default:
@@ -547,7 +617,7 @@ int parse_class_constant(CLASS *jvm_class)
         return 0;
 
 out:
-	free(jvm_class->constant_info);
+	free_constant_info(jvm_class);
         mmap_exit();
         return -1;
 }
@@ -584,6 +654,7 @@ out:
 	jvm_error(VM_ERROR_CLASS_FILE, "JVM access_flag error.\n");
         return -1;
 }
+
 int parse_class_this_super(CLASS *jvm_class)
 {
         CLASS_READ_U2(jvm_class->this_class, p_mem)
@@ -635,39 +706,49 @@ int parse_constant_value(CLASS_FILED *new_filed)
 	return 0;
 }
 
-int parse_class_filed_attribute(CLASS *jvm_class, CLASS_FILED *new_filed)
+int __parse_class_filed_attribute(CLASS *jvm_class, CLASS_FILED *new_filed)
 {
-	u2 name_index, count;
+	u2 name_index;
 	u1 *attr_name;
 
-	/* parse attributes */
-	for (count = 0; count < new_filed->attributes_count; count++) {
-               	CLASS_READ_U2(name_index, p_mem)
-               	show_class_info("attritbutes name_index: %d\n", name_index);
+       	CLASS_READ_U2(name_index, p_mem)
+        show_class_info("attritbutes name_index: %d\n", name_index);
 
-		attr_name = jvm_class->constant_info[name_index].base;
-               	if (!strcmp(attr_name, "ConstantValue")) {
-                       	show_class_info("parse ConstantValue attribute:\n");
-			if (parse_constant_value(new_filed) == -1)
-				return -1;
-               	}
-               	else if (!strcmp(attr_name, "Signature")) {
-                       	show_class_info("parse Signature:\n");
-               	}
-               	else if (!strcmp(attr_name, "Synthetic")) {
-                       	show_class_info("parse Synthetic:\n");
-               	}
-               	else if (!strcmp(attr_name, "Deprecated")) {
-                       	show_class_info("parse Deprecated:\n");
-               	}
-               	else if (!strcmp(attr_name, "RuntimeVisibleAnnotations")) {
-                       	show_class_info("parse RuntimeVisibleAnnotations:\n");
-               	}
-               	else if (!strcmp(attr_name, "RuntimeInvisibleAnnotations")) {
-                       	show_class_info("parse RuntimeInvisibleAnnotations:\n");
-               	}
-		else {
-			jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attributes.");
+	attr_name = jvm_class->constant_info[name_index].base;
+        if (!strcmp(attr_name, "ConstantValue")) {
+               	show_class_info("parse ConstantValue attribute:\n");
+		if (parse_constant_value(new_filed) == -1)
+			return -1;
+      	}
+       	else if (!strcmp(attr_name, "Signature")) {
+              	show_class_info("parse Signature:\n");
+        }
+        else if (!strcmp(attr_name, "Synthetic")) {
+                show_class_info("parse Synthetic:\n");
+        }
+        else if (!strcmp(attr_name, "Deprecated")) {
+                show_class_info("parse Deprecated:\n");
+        }
+        else if (!strcmp(attr_name, "RuntimeVisibleAnnotations")) {
+                show_class_info("parse RuntimeVisibleAnnotations:\n");
+        }
+        else if (!strcmp(attr_name, "RuntimeInvisibleAnnotations")) {
+                show_class_info("parse RuntimeInvisibleAnnotations:\n");
+        }
+	else {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM parse wrong attributes.");
+		return -1;
+	}
+
+	return 0;
+}
+
+int parse_class_filed_attribute(CLASS *jvm_class, CLASS_FILED *new_filed)
+{
+	u2 count;
+
+	for (count = 0; count < new_filed->attributes_count; count++) {
+		if (__parse_class_filed_attribute(jvm_class, new_filed) == -1) {
 			return -1;
 		}
 	}
@@ -691,8 +772,21 @@ CLASS_FILED *__parse_class_filed(CLASS *jvm_class)
        	CLASS_READ_U2(new_filed->name_index, p_mem)
        	show_class_info("name_index: 0x%x\n", new_filed->name_index);
 
+        if (new_filed->name_index < 1 &&
+                new_filed->name_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM parse filed error.\n");
+		free(new_filed);
+		return -1;
+	}
+
        	CLASS_READ_U2(new_filed->descriptor_index, p_mem)
        	show_class_info("descriptor_index: 0x%x\n", new_filed->descriptor_index);
+        if (new_filed->descriptor_index < 1 &&
+                new_filed->descriptor_index >= jvm_class->constant_pool_count) {
+		jvm_error(VM_ERROR_CLASS_FILE, "JVM parse filed error.\n");
+		free(new_filed);
+		return -1;
+	}
 
        	CLASS_READ_U2(new_filed->attributes_count, p_mem)
        	show_class_info("attributes_count: 0x%x\n", new_filed->attributes_count);
@@ -705,6 +799,7 @@ CLASS_FILED *__parse_class_filed(CLASS *jvm_class)
 	new_filed->name_base = jvm_class->constant_info[new_filed->name_index].base;
 	new_filed->desc_base = jvm_class->constant_info[new_filed->descriptor_index].base;
 	new_filed->class = jvm_class;
+
 	show_class_info("#%s\t%s\n", new_filed->name_base, new_filed->desc_base);
 	list_add_tail(&(new_filed->list), &(jvm_class->filed_list_head));
 

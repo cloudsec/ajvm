@@ -84,6 +84,18 @@
 #include "trace.h"
 #include "log.h"
 
+void safe_printf(char *fmt, ...)
+{
+        va_list arg;
+        char buf[1024];
+
+        va_start(arg, fmt);
+        vsprintf(buf, fmt, arg);
+        va_end(arg);
+
+	write(1, buf, strlen(buf) + 1);
+}
+
 #if __WORDSIZE == 64
 void show_stack(ucontext_t *uc)
 {
@@ -93,11 +105,11 @@ void show_stack(ucontext_t *uc)
 	rsp = uc->uc_mcontext.gregs[REG_RSP];
 	rbp = uc->uc_mcontext.gregs[REG_RBP];
 
-        printf("Stack:\t\t\nrsp: 0x%016x\t\trbp: 0x%016x\n", rsp, rbp);
+        safe_printf("Stack:\t\t\nrsp: 0x%016x\t\trbp: 0x%016x\n", rsp, rbp);
         for (i = 0; i < 16; i++) {
-                printf("0x%02x ", *((unsigned char *)rsp + i));
+                safe_printf("0x%02x ", *((unsigned char *)rsp + i));
         }
-        printf("\n\n");
+        safe_printf("\n\n");
 }
 
 void show_registers(ucontext_t *uc)
@@ -122,9 +134,9 @@ void show_registers(ucontext_t *uc)
 	rip = uc->uc_mcontext.gregs[REG_RIP];
 	cr2 = uc->uc_mcontext.gregs[REG_CR2];
 
-        printf("Registers:\n");
-	printf("RIP: 0x%016x\t\tCR2: 0x%016x\n\n", rip, cr2);
-        printf("rax = 0x%016x, rbx = 0x%016x, rcx = 0x%016x, rdx = 0x%016x\n"
+        safe_printf("Registers:\n");
+	safe_printf("RIP: 0x%016x\t\tCR2: 0x%016x\n\n", rip, cr2);
+        safe_printf("rax = 0x%016x, rbx = 0x%016x, rcx = 0x%016x, rdx = 0x%016x\n"
                 "rsi = 0x%016x, rdi = 0x%016x, r8 = 0x%016x, r9 = 0x%016x\n"
                 "r10 = 0x%016x, r11 = 0x%016x, r12 = 0x%016x, r13 = 0x%016x\n"
                 "r14 = 0x%016x, r15 = 0x%016x\n\n",
@@ -140,11 +152,11 @@ void show_stack(ucontext_t *uc)
 	esp = uc->uc_mcontext.gregs[REG_UESP];
 	ebp = uc->uc_mcontext.gregs[REG_EBP];
 
-        printf("Stack:\t\t\nesp: 0x%08x\t\tebp: 0x%08x\n", esp, ebp);
+        safe_printf("Stack:\t\t\nesp: 0x%08x\t\tebp: 0x%08x\n", esp, ebp);
         for (i = 0; i < 16; i++) {
-                printf("0x%02x ", *((unsigned char *)esp + i));
+                safe_printf("0x%02x ", *((unsigned char *)esp + i));
         }
-        printf("\n\n");
+        safe_printf("\n\n");
 }
 
 void show_registers(ucontext_t *uc)
@@ -160,9 +172,9 @@ void show_registers(ucontext_t *uc)
 	edi = uc->uc_mcontext.gregs[REG_EDI];
 	eip = uc->uc_mcontext.gregs[REG_EIP];
 
-        printf("Registers:\n");
-	printf("EIP: 0x%08x\n\n", eip);
-        printf("eax = 0x%08x, ebx = 0x%08x, ecx = 0x%08x, edx = 0x%08x\n"
+        safe_printf("Registers:\n");
+	safe_printf("EIP: 0x%08x\n\n", eip);
+        safe_printf("eax = 0x%08x, ebx = 0x%08x, ecx = 0x%08x, edx = 0x%08x\n"
                 "esi = 0x%08x, edi = 0x%08x\n"
                 rax, rbx, rcx, rdx, rsi, rdi);
 }
@@ -187,14 +199,14 @@ void segfault_handler(int sig_num, siginfo_t *sig_info, void *ptr)
         int flag = 0, first_bp = 0;
 
         assert(sig_info != NULL);
-        printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
+        safe_printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
                 getpid(), sig_info->si_addr,
                 sig_info->si_signo, sig_info->si_errno);
 
         show_registers(uc);
         show_stack(uc);
 
-        printf("Call trace:\n\n");
+        safe_printf("Call trace:\n\n");
 
 #ifdef GCC_BUILTIN_ADDRESS
         rbp = (unsigned long *)__builtin_frame_address(1);
@@ -232,7 +244,7 @@ void segfault_handler(int sig_num, siginfo_t *sig_info, void *ptr)
                         flag = 1;
                 }
         }
-        printf("\n");
+        safe_printf("\n");
 
         exit(0);
 }
@@ -247,14 +259,14 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
         int flag = 0, first_bp = 0;
 
         assert(sig_info != NULL);
-        printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
+        safe_printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
                 getpid(), sig_info->si_addr,
                 sig_info->si_signo, sig_info->si_errno);
 
         show_registers(uc);
         show_stack(uc);
 
-        printf("Call trace:\n\n");
+        safe_printf("Call trace:\n\n");
         num = backtrace(addr, 32);
 	addr[1] = (unsigned long *)uc->uc_mcontext.gregs[REG_RIP];
 
@@ -284,7 +296,7 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
                         flag = 1;
                 }
         }
-        printf("\n");
+        safe_printf("\n");
 
 	exit(0);
 }
@@ -380,7 +392,7 @@ void show_calltrace(CALL_TRACE *trace)
 
 	snprintf(buff, sizeof(buff), "[<0x%x>] %s + 0x%x/0x%x\n", 
 			trace->rip, trace->symbol_name, trace->offset, trace->size);
-	printf("%s", buff);
+	safe_printf("%s", buff);
 }
 
 int get_self_path(char *proc_path, int proc_path_len)
