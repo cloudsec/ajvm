@@ -1,5 +1,5 @@
 /*
- * log.h - Zhitong Wang 2012   <zhitong.wangzt@aliyun-inc.com>
+ * log.h - Zhitong Wang 2012, 2013   <zhitong.wangzt@aliyun-inc.com>
  */
 
 #ifndef LOG_H
@@ -12,7 +12,7 @@
 #define LOG_SIZE                (20 * 1024 * 1024)      // 20M
 
 typedef enum {
-        LOG_FATAL,
+        LOG_FATAL = 0,
         LOG_ERROR,
         LOG_INFO,
         LOG_DEBUG,
@@ -32,57 +32,57 @@ typedef struct log_arg {
         pthread_mutex_t log_lock;
 }LOG_ARG;
 
-int log_init(void);
-int debug_init(void);
-void debug_exit(void);
+int log_init(char *log_path, int log_level);
+int debug_init(int debug_level);
+void log_destroy(void);
+
 void log_lock(void);
 void log_unlock(void);
-
-#define debug(fmt, ...)         do_log(LOG_DEBUG, __FILE__,           		\
+#define debug(fmt, ...)         do_log(LOG_DEBUG,  __FILE__,           \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug(fmt, ...)       do_debug(LOG_DEBUG, __FILE__,         		\
+#define __debug(fmt, ...)       do_debug(LOG_DEBUG, __FILE__,         \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define debug1(fmt, ...)        do_log(LOG_DEBUG1, __FILE__,          		\
+#define debug1(fmt, ...)        do_log(LOG_DEBUG1,  __FILE__,          \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug1(fmt, ...)      do_debug(LOG_DEBUG1, __FILE__,        		\
+#define __debug1(fmt, ...)      do_debug(LOG_DEBUG1,  __FILE__,        \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define debug2(fmt, ...)        do_log(LOG_DEBUG2, __FILE__,          		\
+#define debug2(fmt, ...)        do_log(LOG_DEBUG2, __FILE__,          \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __debug2(fmt, ...)      do_debug(LOG_DEBUG2, __FILE__,        		\
+#define __debug2(fmt, ...)      do_debug(LOG_DEBUG2, __FILE__,        \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define fatal(fmt, ...)         do_log(LOG_FATAL, __FILE__,           		\
+#define fatal(fmt, ...)         do_log(LOG_FATAL, __FILE__,           \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __fatal(fmt, ...)       do_debug(LOG_FATAL, __FILE__,         		\
+#define __fatal(fmt, ...)       do_debug(LOG_FATAL, __FILE__,         \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define error(fmt, ...)         do_log(LOG_ERROR, __FILE__,           		\
+#define error(fmt, ...)         do_log(LOG_ERROR, __FILE__,           \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __error(fmt, ...)       do_debug(LOG_ERROR, __FILE__,         		\
+#define __error(fmt, ...)       do_debug(LOG_ERROR, __FILE__,         \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define info(fmt, ...)          do_log(LOG_INFO, __FILE__,            		\
+#define info(fmt, ...)          do_log(LOG_INFO, __FILE__,            \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 
-#define __info(fmt, ...)        do_debug(LOG_INFO, __FILE__,          		\
+#define __info(fmt, ...)        do_debug(LOG_INFO, __FILE__,          \
                                         __FUNCTION__, __LINE__,                 \
                                         fmt, ##__VA_ARGS__);
 

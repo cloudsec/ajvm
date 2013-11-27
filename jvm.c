@@ -103,9 +103,6 @@ int disass_jvm_class(JVM_ARG *arg)
 
 int jvm_init(JVM_ARG *arg, const char *class_name)
 {
-        if (log_init() == -1)
-                return -1;
-
 	if (calltrace_init() == -1)
 		return -1;
 
@@ -163,22 +160,19 @@ int main(int argc, char **argv)
                 return 0;
         }
 	
-	GET_TOP_RBP(top_rbp)
+	GET_BP(top_bp)
 
-	if (debug_init() == -1) {
-		fprintf(stderr, "debug init failed.\n");
+	if (log_init("/tmp/wvm", LOG_DEBUG2) == -1) {
+		fprintf(stderr, "log init failed.\n");
 		return -1;
 	}
 
 	if (calltrace_init() == -1) {
 		fprintf(stderr, "calltrace init failed.\n");
-		debug_exit();
 		return -1;
 	}
 
 	if (jvm_arg_init() == -1) {
-		debug_exit();
-		calltrace_exit();
 		return -1;
 	}
 
@@ -211,7 +205,6 @@ int main(int argc, char **argv)
 	if (jvm_arg->print_class) {
 		show_jvm_class(jvm_arg);
 		jvm_arg_exit();
-		debug_exit();
 		calltrace_exit();
 		return 0;
 	}
@@ -219,28 +212,24 @@ int main(int argc, char **argv)
 	if (jvm_arg->disass_class) {
 		disass_jvm_class(jvm_arg);
 		jvm_arg_exit();
-		debug_exit();
 		calltrace_exit();
 		return 0;
 	}
 
 	if (jvm_init(jvm_arg, argv[argc - 1]) == -1) {
 		jvm_arg_exit();
-		debug_exit();
 		calltrace_exit();
 		return 0;
 	}
 
 	if (jvm_run(argv[argc - 1]) == -1) {
 		jvm_arg_exit();
-		debug_exit();
 		calltrace_exit();
 		return -1;
 	}
 
 	jvm_exit();
 	jvm_arg_exit();
-	debug_exit();
 	calltrace_exit();
 
         return 0;
