@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 zhitong.wangzt@aliyun-inc.com
+ * Copyright (C) 2012, 2013, 2014 zhitong.wangzt@aliyun-inc.com
  *
  */
 
@@ -19,7 +19,7 @@
 
 #include "log.h"
 
-static LOG_ARG *log_arg = NULL;
+LOG_ARG *log_arg = NULL;
 
 int __get_process_name(char *proc_path, char *proc_name)
 {
@@ -73,11 +73,18 @@ int get_process_name(char *proc_name)
         return -1;
 }
 
-int log_init(char *log_path, int log_level)
+int log_init(char *log_path, int log_level, int log_size, int log_num)
 {
         char buff[1024];
         char proc_name[64];
         char pwd[1024];
+
+	if (log_level > LOG_NOLEVEL ||
+		log_size > MAX_LOG_SIZE ||
+		log_num > MAX_LOG_NUM) {
+		printf("log argument error.\n");
+		return -1;
+	}
 
         memset(proc_name, '\0', 64);
         if (get_process_name(proc_name) == -1)
@@ -93,7 +100,7 @@ int log_init(char *log_path, int log_level)
         }
 
         log_arg->log_level = log_level;
-        log_arg->log_file_num = LOG_NUM;
+        log_arg->log_file_num = log_num;
         log_arg->curr_log_num = 0;
 
         /* the kernel will write data into memory cache first,
@@ -102,7 +109,7 @@ int log_init(char *log_path, int log_level)
          * write them to the disk from memory cache, but in order to
          * improve the performance, we just raise the log_size:::-).
          */
-        log_arg->log_size = LOG_SIZE;
+        log_arg->log_size = log_size * 1024 * 1024;
         snprintf(log_arg->log_path, 1024, "%s/%d", log_path, getpid());
         pthread_mutex_init(&log_arg->log_lock, NULL);
 
@@ -160,6 +167,7 @@ void do_log(LOG_LEVEL log_level, char *file_name, char *function,
                 return ;
         }
 
+	fflush(log_arg->log_fp);
         fprintf(log_arg->log_fp, "%s", buf);
         log_unlock();
 }
@@ -205,41 +213,51 @@ void do_debug(LOG_LEVEL log_level, char *file_name, char *function,
 
 int extract_log_num(void)
 {
-        char *s = log_arg->curr_log;
-        char tmp[4];
+        char *s;
 
         assert(s != NULL);
-
-        while (*s++);
-        s--;
-
-        while (*--s != '.')
-
-        strcpy(tmp, s + 1);
-
-        return atoi(tmp);
+	s = strchr(log_arg->curr_log, '.');
+	if (s)
+        	return atoi(s + 1);
+	else
+		return 0;
 }
 
-/*
- * already hold the log_lock.
- */
+/* already hold the log_lock. */
 int expand_log(void)
 {
+	struct stat f_stat;
         int log_num;
-        char buff[1024];
+        char tmp[1024];
+
+	/* close current log file first. */
+        fclose(log_arg->log_fp);
 
         log_num = extract_log_num();
+	if (log_num == 0)
+		return -1;
+
+	printf("current log num: %d\n", log_num);
         if (log_num == log_arg->log_file_num) {
-                snprintf(buff, sizeof(buff), "%s/log.%d", log_arg->log_path, 1);
+                snprintf(tmp, sizeof(tmp), "%s/log.%d", log_arg->log_path, 1);
         }
         else {
-                snprintf(buff, sizeof(buff), "%s/log.%d", log_arg->log_path, log_num + 1);
+                snprintf(tmp, sizeof(tmp), "%s/log.%d", log_arg->log_path, 
+			log_num + 1);
         }
+	printf("new log: %s\n", tmp);
 
-        fclose(log_arg->log_fp);
+	/* log file already exist. */
+	if (stat(tmp, &f_stat) == 0) {
+		printf("log already exist.\n");
+		if (unlink(tmp) == -1)
+			return -1;
+		printf("delete log ok.\n");
+	}
+
         memset(log_arg->curr_log, '\0', 1024);
-        strcpy(log_arg->curr_log, buff);
-        log_arg->log_fp = fopen(buff, "w+");
+        strcpy(log_arg->curr_log, tmp);
+        log_arg->log_fp = fopen(log_arg->curr_log, "w+");
         if (!log_arg->log_fp) {
                 return -1;
         }

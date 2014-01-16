@@ -19,5 +19,7 @@ unsigned long *top_bp;
 void calltrace(void);
 void calltrace_gnu(void);
 void show_calltrace(CALL_TRACE *trace);
+int calltrace_init(void);
+void calltrace_destroy(void);
 
 #endif

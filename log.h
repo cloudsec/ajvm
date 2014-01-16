@@ -9,7 +9,10 @@
 #include <pthread.h>
 
 #define LOG_NUM                 10
-#define LOG_SIZE                (20 * 1024 * 1024)      // 20M
+#define LOG_SIZE                (20 *1024 * 1024)      		// 20M
+
+#define MAX_LOG_NUM		4096
+#define MAX_LOG_SIZE		(1 * 1024 * 1024 * 1024)	// 1G
 
 typedef enum {
         LOG_FATAL = 0,
@@ -32,7 +35,7 @@ typedef struct log_arg {
         pthread_mutex_t log_lock;
 }LOG_ARG;
 
-int log_init(char *log_path, int log_level);
+int log_init(char *log_path, int log_level, int log_size, int log_num);
 int debug_init(int debug_level);
 void log_destroy(void);
 

@@ -71,6 +71,8 @@
 #include "safe_printf.h"
 #include "log.h"
 
+extern LOG_ARG *log_arg;
+
 #if __WORDSIZE == 64
 void show_stack(ucontext_t *uc)
 {
@@ -199,7 +201,7 @@ void segfault_handler(int sig_num, siginfo_t *sig_info, void *ptr)
 
                         if (flag == 1) {
                                 if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
-                                        __debug2("calltrace: search symbol failed.");
+                                        __debug2("calltrace: search symbol failed.\n");
                                         continue;
                                 }
 
@@ -235,7 +237,7 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
         void *addr[MAX_TRACE_NUM];
         unsigned long real_rip;
         int i, num;
-        int flag = 0, first_bp = 0;
+        int flag = 0;
 
         assert(sig_info != NULL);
         safe_printf("\n#Pid: %d segfault at addr: 0x%016x\tsi_signo: %d\tsi_errno: %d\n\n",
@@ -255,7 +257,7 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
 
                 if (flag == 1) {
                         if (search_symbol_by_addr(real_rip, &prev_trace) == -1) {
-                                __debug2("search symbol failed: 0x%x", real_rip);
+                                __debug2("search symbol failed: 0x%016x.\n", real_rip);
                                 continue;
                         }
 
@@ -267,7 +269,7 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
                 }
                 else {
                         if (search_symbol_by_addr(real_rip, &trace) == -1) {
-                                __debug2("search symbol failed: 0x%x", real_rip);
+                                __debug2("search symbol failed: 0x%016x.\n", real_rip);
                                 //continue;
                         }
                         /* the rip generate segfault. */
@@ -277,7 +279,8 @@ void segfault_handler_gnu(int sig_num, siginfo_t *sig_info, void *ptr)
         }
         safe_printf("\n");
 
-        exit(0);
+	fflush(log_arg->log_fp);
+	signal(SIGSEGV, SIG_DFL);
 }
 
 void calltrace(void)
@@ -435,7 +438,7 @@ int calltrace_init(void)
         return 0;
 }
 
-void calltrace_exit(void)
+void calltrace_destroy(void)
 {
         elf_exit();
 }

@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "jvm.h"
+#include "wvm.h"
 #include "log.h"
 #include "trace.h"
 #include "vm_error.h"
@@ -79,6 +79,6 @@ void jvm_error(int flag, char *fmt, ...)
 
 	calltrace();
 	mmap_exit();
-	calltrace_exit();
+	calltrace_destroy();
 	exit(0);
 }
